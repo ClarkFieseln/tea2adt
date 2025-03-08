@@ -62,8 +62,10 @@ def main():
         try:
             # call tea2adt shell script
             ############################
-            if "tmux" in TERMINAL:
-                # create a new tmux session where following tmux calls will execute
+            if (("tmux" in TERMINAL) and ((sys.argv[1] == "-c") or (sys.argv[1] == "--chat") or (sys.argv[1] == "-s")
+                or (sys.argv[1] == "--rs") or (sys.argv[1] == "--remote-shell") or (sys.argv[1] == "--reverse-shell") or (sys.argv[1] == "-f")
+                or (sys.argv[1] == "--file") or (sys.argv[1] == "--file-transfer") or (sys.argv[1] == "-p") or (sys.argv[1] == "--probe"))):
+                # create a new tmux session where following tmux calls will execute (but only for arguments -c, -s, -f and -p)
                 command = "".join(["tmux new-session ./tea2adt '", sys.argv[1], "'"])
             else:
                 command = "".join(["./tea2adt '", sys.argv[1], "'"])
