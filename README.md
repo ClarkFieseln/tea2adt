@@ -30,7 +30,7 @@ See also <https://www.codeproject.com/Articles/5295970/Audio-Chat-for-Quite-Good
   chmod +x *.sh
 ```
    
-  during first execution you will be asked to install dependencies: minimodem, gpg, bc
+  during first execution you will be asked to install dependencies: minimodem, gpg, bc, ...
   
   but you can also install them yourself with:
 ```
