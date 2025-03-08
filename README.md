@@ -109,7 +109,7 @@ The most important settings are:
 When installed with git, tea2adt may be called with: 
 
 ```
-  python3 tea2adt.py -c
+  python3 tea2adt.py -c 
   # or
   ./tea2adt -c
 ```
