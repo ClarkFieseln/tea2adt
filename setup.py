@@ -13,7 +13,7 @@ __version__ = (HERE / "tea2adt_source/version").read_text()
 
 # This call to setup() does all the work
 setup(
-    name="tea2adt_source",
+    name="tea2adt",
     version=__version__,
     description = "Encrypted audio tunnel for secure chat, file transfer and remote shell on Linux.",
     long_description=README,
