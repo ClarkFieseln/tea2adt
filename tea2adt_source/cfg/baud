@@ -1,0 +1,7 @@
+2400
+#cable(100-15000Hz)=9600
+#walkie-talkie(830-3000Hz)=1200
+#skype(300-5000Hz)=1200
+#atox(100-15000Hz)=1200
+#trifa(100-15000Hz)=1200
+#termux(over qtox)=2400

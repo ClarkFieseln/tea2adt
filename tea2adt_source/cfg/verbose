@@ -1,0 +1,2 @@
+false
+# WARNING: if verbose is set to true it may produce glitches which in turn produce several other errors like "binary data" = sync-errors

@@ -1,0 +1,5 @@
+0.0
+# cable=2.0 (we use life-signs)
+# walkie-talkie=0.0 (we use preamble instead)
+# messenger=0.0 (we use preamble instead)
+# termux(over qtox)=0.0 (use start_msg instead)

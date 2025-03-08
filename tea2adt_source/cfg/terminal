@@ -1,0 +1,8 @@
+tmux split-window -v
+# gnome-terminal --geometry=120x40+100+200 --
+# konsole -e
+# konsole --new-tab --separate -e
+# konsole --new-tab -e
+# tmux split-window -h
+# tmux split-window -v
+# terminator --new-tab -e

@@ -1,0 +1,6 @@
+logging.WARNING
+#logging.DEBUG
+#logging.INFO
+#logging.WARNING (default)
+#logging.ERROR
+#logging.CRITICAL
