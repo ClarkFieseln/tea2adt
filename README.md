@@ -30,15 +30,16 @@ See also <https://www.codeproject.com/Articles/5295970/Audio-Chat-for-Quite-Good
   chmod +x *.sh
 ```
    
-  during first execution you will be asked to install dependencies: minimodem, gpg, bc, ...
+  during first execution you will be asked to install dependencies: minimodem, gpg, bc, tmux, ...
   
   but you can also install them yourself with:
 ```
   sudo apt install minimodem
   sudo apt install gpg
   sudo apt install bc
+  sudo apt install tmux
+  ...
 ```
-  The package gnome-terminal is assumed to be already installed, install otherwise or change cfg/terminal.
 
 ## How to use (pip installation)
 ### Chat/Messenger
