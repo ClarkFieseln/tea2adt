@@ -248,7 +248,7 @@ https://github.com/ClarkFieseln/tea2adt/tree/main/screenshots
 
 ## Videos
 
-https://www.youtube.com/playlist?list=PLX24fhcibpHUx7ej_Tp4neobJUqOkqliN
+https://www.youtube.com/playlist?list=PLX24fhcibpHXllvUgFUw6Ly9cwQcTcKac
 
 ## License
 
