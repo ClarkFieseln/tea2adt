@@ -1,0 +1,21 @@
+# note: remember to modify the call to minimodem --tx inside mmrx.py also!
+if [ "${HALF_DUPLEX}" == true ] ; then
+    # get mic index
+    default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '...$')
+    if [ "${default_source_index:0:1}" == ":" ] ; then
+         default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '..$')
+    fi    
+    # mute mic
+    pacmd set-source-mute ${default_source_index} 1
+    # set mic volume to zero
+    # pactl -- set-source-volume ${default_source_index} "0%"
+    # call minimodem tx passing echoed string passed to this source
+    xargs -0 -I {} echo {} | minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 --sync-byte ${SYNCBYTE} --volume 1.0 ${BAUD}
+    # unmute mic
+    pacmd set-source-mute ${default_source_index} 0
+    # restore mic volume
+    # pactl -- set-source-volume ${default_source_index} ${VOLUME_MICROPHONE}
+else
+    # call minimodem tx passing echoed string passed to this source
+    xargs -0 -I {} echo {} | minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 --sync-byte ${SYNCBYTE} --volume 1.0 ${BAUD}
+fi

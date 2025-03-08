@@ -1,0 +1,100 @@
+- TTS:
+  check how to make this work in Termux
+- STT: 
+  implement it or document how to configure
+- offline AI prompt:
+  ------------------
+  use offline AI (e.g. ollama run llama3)
+  note: running ollama command in remote shell does not work (same problem as interactive python command)
+  possible implementation: 
+      use separate input and output pipes, and increase values of timeouts in mmrx.py: 
+      AI_OUTPUT_READ_TIMEOUT_SEC, AI_OUT_MAX_DELAY (similar to SHELL_... timeouts)
+- update screenshots and videos
+- GUI (option -g):
+  - add sub-menus, e.g. showing selection options from available interfaces in order to set interface_index_tts_out
+  - add support to restore cfg to default values
+- fix audio input/output interfaces as configured
+  - no default anymore for communication
+  - TTS and STT audio interfaces could be set once for the App at system level (e.g. using .audiorc) instead of setting them with each call
+- test long-range with walkie-talkies (up to 6 Km in theory!)
+- sniffer: add new option and file mmrxsniff.sh
+           with no pwd: like mmrxnopwd.sh but removing the ACKs
+           can also easily reuse mmrx.sh to impl. sniffer?
+           otherwise, with mmrx.py
+- new option to use tmux split-window -v i.o. konsole -e -> just config?
+- check at startup if the configured terminal is available and use system default instead or install with sudo apt install as required
+- specify/configure audio interfaces:
+  - for the use case with 2 offline-devices:
+    the Receiver offline-device could as well receive over a 2nd audio interface the data being sent and then decrypt it to show the complete conversation on the same screen:
+                        ----->  receiver     <--
+          internet-PC                           | 2nd. audio interface 
+                        <-----  transmitter  -->
+- extend session initialization to support AUTONEGOTIATION, that is, agreement on:
+  - protocol version
+  - BAUD
+  - NEED_ACK
+  - etc.
+  Use default 300 or 1200 baud for initialzation, then switch to negotiated transfer rate.
+  *** ADJUST VOLUMES on both sides AUTOMATICALLY during session initialization also !!! ***
+  *****************************************************************************************
+- GUI like AC4QGP:
+  "merge" AC4QGP and tea2adt or just "pipe" adapted AC4QGP to tea2adt
+  (we may need to use AT commands or something like that)
+- PEP8 for python code
+- improvement:
+  configurable option: prevent user input during transmission (indicated by missing prompt cursor)? -> adapt mmtx.sh
+- create a new optional parameter to determine the round-trip delay "automatically" and use this value i.o. retransmission_timeout_sec
+  this value can also be checked during the user session in order to monitor it dinamically e.g. in order to re-adjust it
+- use regular expressions to detect damaged "-----BEGIN PGP MESSAGE-----" and "-----END PGP MESSAGE-----" and restore them
+- test offline chat apps communicating over bluetooth or wifi
+  check apps for:
+  wireless ad hoc network (WANET)
+  mobile ad hoc network (MANET)
+  smartphone ad hoc network (SPAN)
+  e.g.: 
+  P2P Offline Call (only Android 13 ?)
+  NOKs:
+  -----
+  Bridgefy (Google account? -> chinese text, bad reviews),
+  Briar (only text messenger, no call),
+  Bluetooth Chat (only chat and images, and only Bluetooth), 
+  Signal Offline Messenger (not available, like many other apps),
+  TrueConf(WiFi - but Google account? -> email not accepted!), ...
+- BUG: verbose = true:
+      produces glitches which in turn produce "binary data" = lack of sync, leading to very unstable behavior
+      find out how to avoid this or remove this feature!
+      so long use with care and be aware of this problem
+- BUG?: with start_msg and 700bps: simultaneous TXs in chat: messages seem to arrive ok, but ACKs seem to collide in logic, check setting of flags.
+        but there seems to be in fact a problem with the configuration. TODO: try RND delay before retransmission.
+- derive more complex/secure pwd from user-pwd using a hash algorithm (but without salting!)
+  For deriving more secure passwords, key derivation functions (KDFs) like PBKDF2, bcrypt, and Argon2 are recommended. 
+  These functions are specifically designed to be computationally intensive, making brute-force attacks more difficult. 
+  They achieve this by applying the hash function multiple times (iterations) *** and using a salt *** -> can avoid this step?
+- more tests with Virtual Machine(s)
+  e.g. split audio-in/out in 2 VMs sharing tmp folder over nfs: need code adaptation?
+- remove:
+  - delay before ACK...was needed because of TRAILER, but now we don't use it anymore
+- improvement: variable retransmission timeout:
+      TODO: long timeouts only in cases where request + response are long
+      otherwise short or proportional to estimated maximum lengths  
+- improvmeent:
+  additional measures like signature verification as recommended here: https://github.com/ClarkFieseln/AC4QGP/issues/2
+- investigate:
+  - how to deal with system sounds
+    (with 9.6 kbaud it was still possible to transmit information with ACKs even as music was played in the background, but the comm. errors increased)
+- traffic masking? e.g. if minimodem TX continuously...can hide also metadata, e.g. nr. of messages, etc.
+- support for password-protected pre-shared keys (PSK) -> see GPG
+- add support of signature
+- provide "forward secrecy" meaning retrospective decryption of unlogged messages is impossible
+  (warning: PGP lacks forward secrecy, once private RSA key exfiltrated all past and fufure communication can be decrypted passively)
+- improvement: performance:
+  implement everything in C or C++ to gain speed, readability, etc.
+  (relatively small performance gain, e.g. of 15ms, as the biggest delays are introduced by gpg and minimodem)
+- shell: interactive sessions, e.g. with calc, during remote shell are possible
+         but this is not the case e.g. when calling python -> implement (move session to sub-shell?)
+- shell: the command clear is executed only after a new command is executed. Solution?
+- shell: starting programs, e.g. gedit, works but then what? we cannot interact with the app.
+- plausibility checks on configuration parameters
+- similar to TFC-Installation: protection measures (see here: https://github.com/maqp/tfc/wiki/Threat-model)
+TLS-MITM attack during installation
+As long as the user has a way (face-to-face meeting with the developer or web of trust) to obtain the authentic fingerprint of the PGP key used to sign the installer, installation is mostly secure against MITM attacks. TFC is installed with a one-liner, the pinned SHA256 fingerprint of which authenticates the 4096-bit PGP/RSA signature verification key, which in turn authenticates the installer. If the attacker has a sufficient universal quantum computer that is capable of running Shor's algorithm, the authenticity of the installer cannot be reliably guaranteed with PGP signatures. The installer comes with pinned SHA512 hashes of all files downloaded from TFC's GitHub repository. These files include the requirements*.txt-files that contain the SHA512 hashes for dependencies downloaded over PIP. However, TFC requires dependencies (namely git, libssl-dev, net-tools, python3-pip, python3-setuptools, python3-tk, and Tor) that are downloaded with APT, and while the related public signature verification key is pinned to the OS, the exfiltration security of the private signing keys of third parties cannot be guaranteed.

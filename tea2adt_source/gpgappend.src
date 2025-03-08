@@ -1,0 +1,3 @@
+# note: remember to also modify the call to gpg inside mmrx.py if required!
+gpg --symmetric --cipher-algo ${CIPHER_ALGO} --batch --passphrase "${PASSWORD}" ${ARMOR} >> ${MSGFILE}
+

@@ -1,0 +1,334 @@
+#!/bin/bash
+
+# read tmp path
+TMP_PATH=$(head -n 1 cfg/tmp_path)
+
+# read version
+VERSION=$(head -n 1 version)
+
+# install dependencies?
+INSTALL_DEPENDENCIES=$(head -n 1 cfg/install_dependencies)
+if [ "${INSTALL_DEPENDENCIES}" == true ] ; then
+    read -p "Do you want to install dependencies(y/Y)? " -n 1 -r
+    echo    # (optional) move to a new line
+    if [[ $REPLY =~ ^[Yy]$ ]]
+    then
+        echo "-------------------------------------------"
+        ${TERMINAL} ./install_dependencies.sh
+        echo "-------------------------------------------"
+    else
+        read -p "Please install dependencies by hand as described in the documentation, cfg/install_dependencies will be set to false"
+    fi
+    echo "false" > cfg/install_dependencies
+fi 
+        
+# first remove previous temporary working folder
+if [ -d "${HOME}${TMP_PATH}" ]; then
+    rm -r "${HOME}${TMP_PATH}"
+fi
+
+# create new temporary working folder
+mkdir -p "${HOME}${TMP_PATH}"
+
+# copy files to tmp path
+cp -r "./cfg" "${HOME}${TMP_PATH}"
+cp -r "./state" "${HOME}${TMP_PATH}"
+cp -r "./tmp" "${HOME}${TMP_PATH}"
+
+# read configuration from files copied in tmp path
+BAUD=$(head -n 1 ${HOME}${TMP_PATH}/cfg/baud)
+SYNCBYTE=$(head -n 1 ${HOME}${TMP_PATH}/cfg/syncbyte)
+CONFIDENCE=$(head -n 1 ${HOME}${TMP_PATH}/cfg/confidence)
+LIMIT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/limit)
+TERMINAL=$(head -n 1 ${HOME}${TMP_PATH}/cfg/terminal)
+PROBE_MSG=$(head -n 1 ${HOME}${TMP_PATH}/cfg/probe_msg)
+PROBE_SLEEP=$(head -n 1 ${HOME}${TMP_PATH}/cfg/probe_sleep)
+HALF_DUPLEX=$(head -n 1 ${HOME}${TMP_PATH}/cfg/half_duplex)
+VOLUME_SPEAKER_LEFT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_speaker_left)
+VOLUME_SPEAKER_RIGHT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_speaker_right)
+VOLUME_MICROPHONE=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_microphone)
+TEXT_TO_SPEECH=$(head -n 1 ${HOME}${TMP_PATH}/cfg/text_to_speech)
+SPEECH_TO_TEXT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/speech_to_text)
+INTERFACE_INDEX_TTS_OUT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/interface_index_tts_out)
+INTERFACE_INDEX_STT_IN=$(head -n 1 ${HOME}${TMP_PATH}/cfg/interface_index_stt_in)
+VOLUME_STT_IN=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_stt_in)
+VOLUME_TTS_OUT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_tts_out)
+
+trap ctrl_c INT
+
+function ctrl_c()
+{
+    # TODO: kill child/started processes before ctrl-c
+    # kill $(ps -s $$ -o pid=)
+    # pkill -P $$
+    # restore mic volume
+    ${TERMINAL} ./restore_mic.sh &
+    # and now ctr-c
+    trap - INT
+    kill -INT $$
+}
+
+set_volumes()
+{
+    if [ "${VOLUME_SPEAKER_LEFT}" != "" ] ; then
+        default_sink_index=$(pacmd list-sinks | grep "* index: " | grep -o '...$')
+        if [ "${default_sink_index:0:1}" == ":" ] ; then
+             default_sink_index=$(pacmd list-sinks | grep "* index: " | grep -o '..$')
+        fi
+        pactl -- set-sink-volume ${default_sink_index} ${VOLUME_SPEAKER_LEFT} ${VOLUME_SPEAKER_RIGHT}
+        echo "setting default output/speaker volume to L,R = "${VOLUME_SPEAKER_LEFT}","${VOLUME_SPEAKER_RIGHT}
+        # echo "(leave cfg/volume_speaker_left empty in order to not set input volume automtatically)"
+    fi
+    if [ "${VOLUME_MICROPHONE}" != "" ] ; then
+        default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '...$')
+        if [ "${default_source_index:0:1}" == ":" ] ; then
+             default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '..$')
+        fi    
+        pactl -- set-source-volume ${default_source_index} ${VOLUME_MICROPHONE}
+        echo "setting default input/microphone volume to "${VOLUME_MICROPHONE}
+        # echo "(leave cfg/volume_microphone empty in order to not set output volume automtatically)"
+    fi
+    # echo default settings for communication
+    echo "default output/speaker, index = " ${default_sink_index}
+    echo "default input/microphone, index = " ${default_source_index}
+    # TTS
+    if [ "${TEXT_TO_SPEECH}" != "" ] ; then
+        if [ "${VOLUME_TTS_OUT}" != "" ] ; then
+            pactl -- set-sink-volume ${INTERFACE_INDEX_TTS_OUT} ${VOLUME_TTS_OUT}
+            echo "setting TTS output/speaker volume = "${VOLUME_TTS_OUT}
+        fi
+    fi
+    # STT
+    if [ "${SPEECH_TO_TEXT}" == true ] ; then
+        if [ "${VOLUME_STT_IN}" != "" ] ; then
+            pactl -- set-source-volume ${INTERFACE_INDEX_STT_IN} ${VOLUME_STT_IN}
+            echo "setting STT input/microphone volume = "${VOLUME_STT_IN}
+        fi
+    fi
+    # echo TTS and STT settings
+    echo "TTS command = "${TEXT_TO_SPEECH}
+    echo "TTS output/speaker, index = "${INTERFACE_INDEX_TTS_OUT}
+    echo "STT input/microphone, index = "${INTERFACE_INDEX_STT_IN}
+}
+
+create_fifos()
+{
+    if [ "$1" == "-s" ] || [ "$1" == "--rs" ] || [ "$1" == "--remote-shell" ] || [ "$1" == "--reverse-shell" ] ; then
+        PIPE_SHELL_IN="${HOME}${TMP_PATH}/tmp/pipe_shell_in"
+        PIPE_SHELL_OUT="${HOME}${TMP_PATH}/tmp/pipe_shell_out"
+        if [ -p ${PIPE_SHELL_IN} ] || [ -f ${PIPE_SHELL_IN} ]; then
+          rm ${PIPE_SHELL_IN}
+        fi
+        if [ -p ${PIPE_SHELL_OUT} ] || [ -f ${PIPE_SHELL_OUT} ]; then
+          rm ${PIPE_SHELL_OUT}
+        fi
+        mkfifo ${PIPE_SHELL_IN}
+        mkfifo ${PIPE_SHELL_OUT}
+    elif [ "$1" == "-f" ] || [ "$1" == "--file" ] ; then
+        PIPE_FILE_IN="${HOME}${TMP_PATH}/tmp/pipe_file_in"
+        PIPE_FILE_OUT="${HOME}${TMP_PATH}/tmp/pipe_file_out"
+        if [ -p ${PIPE_FILE_IN} ] || [ -f ${PIPE_FILE_IN} ]; then
+          rm ${PIPE_FILE_IN}
+        fi
+        if [ -p ${PIPE_FILE_OUT} ] || [ -f ${PIPE_FILE_OUT} ]; then
+          rm ${PIPE_FILE_OUT}
+        fi
+        mkfifo ${PIPE_FILE_IN}
+        mkfifo ${PIPE_FILE_OUT}
+    fi
+}
+
+ask_password()
+{
+    while true
+    do
+        while true
+        do
+            echo -n "password: "
+            read -ers PASSWORD1
+            echo ""
+            # 2> /dev/null shall prevent showing the password if some error occurs
+            if [ ! "${PASSWORD1}" == "" ] 2> /dev/null
+            then
+                break
+            else
+                echo "Password cannot be empty!"
+            fi
+        done
+        echo -n "confirm password: "
+        read -ers PASSWORD
+        echo ""
+        # 2> /dev/null shall prevent showing the password if some error occurs
+        [ "${PASSWORD1}" == "${PASSWORD}" ] 2> /dev/null && break
+        echo "Passwords dont match!"
+    done
+}
+
+echo_audio_interfaces()
+{
+    # list audio output interfaces
+    echo "audio output interfaces"
+    echo "-----------------------"
+    echo "$(pactl list short sinks)"
+    # list audio input interfaces
+    echo ""
+    echo "audio input interfaces"
+    echo "----------------------"    
+    echo "$(pactl list short sources)"
+    # default audio output / speaker
+    default_sink_index=$(pacmd list-sinks | grep "* index: " | grep -o '...$')
+    if [ "${default_sink_index:0:1}" == ":" ] ; then
+         default_sink_index=$(pacmd list-sinks | grep "* index: " | grep -o '..$')
+    fi
+    # default audio input / mic
+    default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '...$')
+    if [ "${default_source_index:0:1}" == ":" ] ; then
+         default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '..$')
+    fi    
+    # echo settings
+    echo ""
+    echo "audio settings for communication"
+    echo "--------------------------------"
+    echo "default output/speaker, index = " ${default_sink_index}
+    echo "default input/microphone, index = " ${default_source_index}
+    echo ""
+    echo "audio settings for TTS and STT"
+    echo "--------------------------------"
+    echo "TTS output/speaker, index = " ${INTERFACE_INDEX_TTS_OUT}
+    echo "STT input/microphone, index = " ${INTERFACE_INDEX_STT_IN}
+    echo ""
+}
+
+echo_help()
+{
+    echo "usage: tea2adt [-c|-s]    		 
+    		 -c, --chat
+    		 -s, --rs, --remote-shell, --reverse-shell (to execute a command as sudo type: echo \"<pwd>\" | sudo -k -S <cmd>)
+    		 -f, --file, --file-transfer
+    		 -p, --probe (send periodic test messages to check connectivity and adjust the volumes if required)
+    		 -g, --gui (only for configuration)
+    		 -d, --directory (show installation path)
+    		 -V, --version
+    		 -h, --help
+    		 -i, --image
+    		 
+tea2adt is a command-line utility that reads and writes encrypted data across peer-to-peer audio connections, using minimodem and gpg.
+It is a powerful tool that can be combined with any audio infrastructure (like PSTN, cellular network, internet, radio) to provide a secure communication channel through an audio tunnel.
+The audio interfaces behave like data-diodes, each allowing unidirectional data transmission only, thus preventing data-leaks and malware-injection.
+This enables an enhanced-end-to-end encryption (E-E2EE) which notably increases security and privacy, especially when the end devices are completely offline (air-gapped-system), providing an effective barrier against legal or illegal client-side-scanning!
+Homepage: https://github.com/ClarkFieseln/tea2adt"
+}
+
+echo_image()
+{
+    echo "
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓█░█▓▓▓▓▓▓▓▓▓▓███░▓▓▓▓▓▓▓█▓▓▓▓▓▓▓▓▓▓▓▓█░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓█░░█▓▓▓▓▓▓▓▓▓▓███████▓▓▓▓█▓▓▓▓▓▓▓▓▓▓▒█░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓██▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▒░░░▓█▓▓▓▓▓▓▓▓▓███████░██▓█▓▓▓▓▓▓▓▓▓█░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓█▓▓█▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓█░░░▓███████████████████░██░░░░░░░░░█░░░░▓▓▓▓▓▓▓█▓▓▓▓█▓▓▓▓█▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▒░░░██▓▓▓▓▓▓▓▓▓██████▒█▒▓▓█▓▓▓▓▓▓▓▓▓██░░░▓▓▓▓▓▓▓▓█▓▓█▓▓▓▓▓▓▓▓█▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓█░░█▓▓▓▓▓▓▓▓▓▓█████▓▓▓▓▓▓█▓▓▓▓▓▓▓▓▓▓▓▒█░█▓▓▓▓▓▓▓▓██▓▓▓▓▓▓▓██▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒██▓▓▓▓▓▓▓▓▓▓██▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓░░▓▓▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▓▓▓▓██▓▓▓▓▓▓▓▓▓▓▓██▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▒░█▓▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▒█░██▒▓▓▓▓▓▓▓▓▓▓▓░░█▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░██▓▓▓▓▓▓▓▓▓█▓▓▓█░░█████▓▓▓▓▓▓▓▓▓░█░░░█▓▓▓▓▓▓▓▓██▓▓▓▓█▓█▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░█▒░░░░░░░░░██░░██████████████████░░░░█▓▓▓▓▓███▓█▓███▓▓█▓▓▓██▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░█▒▓▓▓▓▓▓▓▓▓█▓▓█████████▓▓▓▓▓▓▓▓▓▓▒░░░█▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▓█▓█▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▒░▓▓▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▒██████▓▓▓▓▓▓▓▓▓▓▓░░▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓░█▓▓▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▓▓▓███▓▓▓▓▓▓▓▓▓▓▓░█▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▓▓▓▓▓▓▓▓▒▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+"
+}
+
+echo_parameters()
+{
+    echo "baud = $BAUD"
+    echo "half_duplex = $HALF_DUPLEX"
+    echo "syncbyte = $SYNCBYTE"
+    echo "confidence = $CONFIDENCE"
+    echo "limit = $LIMIT"
+    echo "terminal = $TERMINAL"
+    echo "volume speaker left = $VOLUME_SPEAKER_LEFT"
+    echo "volume speaker right = $VOLUME_SPEAKER_RIGHT"
+    echo "volume microphone = $VOLUME_MICROPHONE"
+    echo "text to speech = $TEXT_TO_SPEECH"
+    echo "speech to text = $SPEECH_TO_TEXT"
+    echo "volume TTS out = $VOLUME_TTS_OUT"
+    echo "volume STT in = $VOLUME_STT_IN"
+}
+
+echo_version()
+{
+    echo "tea2adt ${VERSION}
+MIT License: <https://opensource.org/license/mit>.    
+Copyright (C) 2025 Clark Fieseln
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law."
+}
+
+if [ "$1" == "" ] ; then
+    echo "tea2adt: *** you must specify an option, run tea2adt -h for more information ***"
+    echo_help
+elif [ "$1" == "-a" ] || [ "$1" == "--audio-settings" ] ; then  
+    echo_audio_interfaces
+elif [ "$1" == "-c" ] || [ "$1" == "--chat" ] ; then
+    ask_password
+    ${TERMINAL} ./mmtx.sh "${PASSWORD}" &
+    # wait a little bit so the transmitter can initialize the state flags
+    sleep 0.5    
+    set_volumes
+    echo_parameters
+    source rx.src | python3 mmrx.py "${PASSWORD}" $1
+elif [ "$1" == "-f" ] || [ "$1" == "--file" ] ; then
+    ask_password
+    create_fifos "$1"
+    ${TERMINAL} ./mmtxfile.sh "${PASSWORD}" &
+    # wait a little bit so the transmitter can initialize the state flags
+    sleep 0.5
+    # track input files
+    ${TERMINAL} cat ${PIPE_FILE_IN} &
+    set_volumes
+    # we don't echo_parameters in -f mode
+    source rx.src | python3 mmrx.py "${PASSWORD}" $1
+elif [ "$1" == "-s" ] || [ "$1" == "--rs" ] || [ "$1" == "--remote-shell" ] || [ "$1" == "--reverse-shell" ] ; then
+    ask_password
+    create_fifos "$1"
+    # create persistent shell to run in background with input and output pipes
+    while true; do /bin/sh &> ${PIPE_SHELL_OUT}; done 0< ${PIPE_SHELL_IN} &
+    set_volumes
+    echo_parameters
+    source rx.src | python3 mmrx.py "${PASSWORD}" $1
+elif [ "$1" == "-p" ] || [ "$1" == "--probe" ] ; then
+    set_volumes
+    echo_parameters
+    ${TERMINAL} ./mmrxnopwd.sh &
+    echo "**********************************"
+    echo "*** tea2adt probe transmitter ***"
+    echo "**********************************"
+    echo "Test messages "${PROBE_MSG}" sent with a delay of "${PROBE_SLEEP}" seconds..."
+    echo "(a separate terminal is opened to receive unencrypted test messages from the communication partner)"
+    while :
+    do     
+        echo ${PROBE_MSG} | source tx.src
+        sleep ${PROBE_SLEEP}
+    done
+elif [ "$1" == "-g" ] || [ "$1" == "--gui" ] ; then
+    python3 gui.py
+elif [ "$1" == "-d" ] || [ "$1" == "--directory" ] ; then
+    echo $(pip show tea2adt | grep Location)"/tea2adt_source"
+elif [ "$1" == "-V" ] || [ "$1" == "--version" ] ; then
+    echo_version
+elif [ "$1" == "-h" ] || [ "$1" == "--help" ] ; then
+    echo_help
+elif [ "$1" == "-i" ] || [ "$1" == "--image" ] ; then
+    echo_image  
+else
+    echo "tea2adt: invalid option"
+fi
