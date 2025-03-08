@@ -2,7 +2,7 @@
 ![plot](https://raw.githubusercontent.com/ClarkFieseln/tea2adt/refs/heads/main/tea2adt_source/tea2adt.png)
 
 # tea2adt
-tea2adt is a command-line utility for Linux that reads and writes encrypted data across peer-to-peer or broadcast audio connections, using [minimodem](https://github.com/kamalmostafa/minimodem "minimodem") and [gpg](https://github.com/gpg/gnupg "gpg").
+tea2adt is a command-line utility for Linux that reads and writes encrypted data across peer-to-peer or broadcast audio connections, using [minimodem](https://github.com/kamalmostafa/minimodem "minimodem") and [gpg](https://github.com/gpg/gnupg "gpg") in order to provide a secure Chat, Remote Shell or File Transfer.
 
 It is a powerful tool that can be combined with any audio infrastructure (like PSTN, cellular network, internet, radio, walkie-talkies) to provide a secure communication channel through an audio tunnel.
 
