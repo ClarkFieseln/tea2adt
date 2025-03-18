@@ -1,0 +1,7 @@
+
+# large language model to use, e.g. with local installation of ollama
+# note: only ollama was tested up to now, e.g. with: 
+#       ollama run llama3
+#       ollama run llama2
+#       ollama run tinyllama
+#       important: if you run the model for the first time then it is first downloaded what may take a long time!  
