@@ -53,6 +53,7 @@ INTERFACE_INDEX_TTS_OUT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/interface_index_tts_o
 INTERFACE_INDEX_STT_IN=$(head -n 1 ${HOME}${TMP_PATH}/cfg/interface_index_stt_in)
 VOLUME_STT_IN=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_stt_in)
 VOLUME_TTS_OUT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_tts_out)
+LLM_CMD=$(head -n 1 ${HOME}${TMP_PATH}/cfg/llm_cmd)
 
 trap ctrl_c INT
 
@@ -113,7 +114,13 @@ set_volumes()
 
 create_fifos()
 {
-    if [ "$1" == "-s" ] || [ "$1" == "--rs" ] || [ "$1" == "--remote-shell" ] || [ "$1" == "--reverse-shell" ] ; then
+    if [ "$1" == "-l" ] || [ "$1" == "--llm" ] || [ "$1" == "--llm-chat" ] || [ "$1" == "--llm-prompt" ] ; then
+        PIPE_LLM_OUT="${HOME}${TMP_PATH}/tmp/pipe_llm_out"
+        if [ -p ${PIPE_LLM_OUT} ] || [ -f ${PIPE_LLM_OUT} ]; then
+          rm ${PIPE_LLM_OUT}
+        fi
+        mkfifo ${PIPE_LLM_OUT}
+    elif [ "$1" == "-s" ] || [ "$1" == "--rs" ] || [ "$1" == "--remote-shell" ] || [ "$1" == "--reverse-shell" ] ; then
         PIPE_SHELL_IN="${HOME}${TMP_PATH}/tmp/pipe_shell_in"
         PIPE_SHELL_OUT="${HOME}${TMP_PATH}/tmp/pipe_shell_out"
         if [ -p ${PIPE_SHELL_IN} ] || [ -f ${PIPE_SHELL_IN} ]; then
@@ -203,10 +210,12 @@ echo_help()
 {
     echo "usage: tea2adt [-c|-s]    		 
     		 -c, --chat
+    		 -l, --llm, --llm-chat, --llm-prompt
     		 -s, --rs, --remote-shell, --reverse-shell (to execute a command as sudo type: echo \"<pwd>\" | sudo -k -S <cmd>)
     		 -f, --file, --file-transfer
     		 -p, --probe (send periodic test messages to check connectivity and adjust the volumes if required)
     		 -g, --gui (only for configuration)
+    		 -a, --audio-settings
     		 -d, --directory (show installation path)
     		 -V, --version
     		 -h, --help
@@ -296,6 +305,31 @@ elif [ "$1" == "-f" ] || [ "$1" == "--file" ] ; then
     ${TERMINAL} cat ${PIPE_FILE_IN} &
     set_volumes
     # we don't echo_parameters in -f mode
+    source rx.src | python3 mmrx.py "${PASSWORD}" $1
+elif [ "$1" == "-l" ] || [ "$1" == "--llm" ] || [ "$1" == "--llm-chat" ] || [ "$1" == "--llm-prompt" ] ; then
+    ask_password
+    create_fifos "$1"
+    if [ "${LLM_CMD}" != "" ] ; then
+        # check if ollama is used and if it is running
+        if [[ ${LLM_CMD} =~ "ollama run" ]]; then
+            while ! curl -s http://localhost:11434/api/tags > /dev/null; do
+                # sleep 1
+                echo "Error: ollama is not running!"
+                exit
+            done
+        fi
+        # create persistent session to run in background with output pipe
+        # (input is done with command 'tmux send-keys -t session_llm')
+        tmux new-session -d -s session_llm "${LLM_CMD} > ${PIPE_LLM_OUT}" &
+        # TODO: use instead 2> to not redirect errors?
+        # tmux new-session -d -s session_llm "${LLM_CMD} 2> ${PIPE_LLM_OUT}" &
+        echo "LLM model started..."
+    else
+        echo "Error: llm_cmd is not configured!"
+        exit
+    fi
+    set_volumes
+    echo_parameters
     source rx.src | python3 mmrx.py "${PASSWORD}" $1
 elif [ "$1" == "-s" ] || [ "$1" == "--rs" ] || [ "$1" == "--remote-shell" ] || [ "$1" == "--reverse-shell" ] ; then
     ask_password
