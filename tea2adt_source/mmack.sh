@@ -7,7 +7,7 @@
     [init_ack_chat]
     [init_ack_shell]
     [init_ack_llm]
-    [init_ack_file]    
+    [init_ack_file]
     [keepalive]
     <probe>
     <start_msg>
@@ -50,7 +50,7 @@ SEQ_TX=$(head -n 1 ${SEQ_TX_FILE})
 SEQ_TX_ACKED=$(head -n 1 ${SEQ_TX_ACKED_FILE})
 SEQ_RX_NEW=$(head -n 1 ${SEQ_RX_FILE})            
 if [[ ${SEQ_RX_NEW} != ${INVALID_SEQ_NR} ]] ; then
-    # we don't clean state, that will be done in mmshellout.sh     
+    # we don't clean state, that will be done in mmsessionout.sh     
     SEQ_RX=${SEQ_RX_NEW}
 else
     if [ "${VERBOSE}" == true ] ; then
@@ -71,7 +71,7 @@ PASSWORD="$1"
 if [ "${NEED_ACK}" == "true" ] ; then
     if [[ ${SEQ_RX} != ${INVALID_SEQ_NR} ]] && [[ ${SEQ_RX_NEW} != ${INVALID_SEQ_NR} ]] ; then
         # SEQ_RX to be acknowledged in ACK message
-        # we don't clean state, that will be done in mmshellout.sh
+        # we don't clean state, that will be done in mmsessionout.sh
         SEQ_RX=${SEQ_RX_NEW}
         seq_rx=$((SEQ_RX+33))
         seq_rx_ascii=$(printf "\x$(printf %x $seq_rx)")        
