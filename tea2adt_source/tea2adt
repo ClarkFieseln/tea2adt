@@ -221,7 +221,7 @@ echo_help()
     		 -h, --help
     		 -i, --image
     		 
-tea2adt is a command-line utility for Chat, Remote Shell and File Transfer, that reads and writes encrypted data across peer-to-peer or broadcast audio connections, using minimodem and gpg.
+tea2adt is a command-line utility for Chat, Remote Shell, Remote AI Prompt and File Transfer, that reads and writes encrypted data across peer-to-peer or broadcast audio connections, using minimodem and gpg.
 It is a powerful tool that can be combined with any audio infrastructure (like PSTN, cellular network, internet, radio) to provide a secure communication channel through an audio tunnel.
 The audio interfaces behave like data-diodes, each allowing unidirectional data transmission only, thus preventing data-leaks and malware-injection.
 This enables an enhanced-end-to-end encryption (E-E2EE) which notably increases security and privacy, especially when the end devices are completely offline (air-gapped-system), providing an effective barrier against legal or illegal client-side-scanning!
