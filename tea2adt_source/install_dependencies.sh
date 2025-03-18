@@ -12,12 +12,11 @@ sudo $(which apt) update
 sudo $(which apt) install minimodem
 sudo $(which apt) install gpg
 sudo $(which apt) install bc
+sudo $(which apt) install tmux
 # install terminal
 # TODO: we may combine e.g. cool-retro-term with tmux, automate installation also in this case (?)
 if [[ ${TERMINAL} =~ "gnome-terminal" ]]; then
   sudo $(which apt) install gnome-terminal
-elif [[ ${TERMINAL} =~ "tmux" ]]; then
-  sudo $(which apt) install tmux
 elif [[ ${TERMINAL} =~ "cool-retro-term" ]]; then
   sudo $(which apt) install cool-retro-term  
 fi
