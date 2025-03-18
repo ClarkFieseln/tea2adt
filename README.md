@@ -2,7 +2,7 @@
 ![plot](https://raw.githubusercontent.com/ClarkFieseln/tea2adt/refs/heads/main/tea2adt_source/tea2adt.png)
 
 # tea2adt
-tea2adt is a command-line utility for Chat, Remote Shell and File Transfer, that reads and writes encrypted data across peer-to-peer or broadcast audio connections, using [minimodem](https://github.com/kamalmostafa/minimodem "minimodem") and [gpg](https://github.com/gpg/gnupg "gpg").
+tea2adt is a command-line utility for Chat, Remote Shell, Remote AI Prompt and File Transfer, that reads and writes encrypted data across peer-to-peer or broadcast audio connections, using [minimodem](https://github.com/kamalmostafa/minimodem "minimodem") and [gpg](https://github.com/gpg/gnupg "gpg").
 
 It is a powerful tool that can be combined with any audio infrastructure (like PSTN, cellular network, internet, radio, walkie-talkies) to provide a secure communication channel through an audio tunnel.
 
@@ -62,6 +62,17 @@ On the other device a chat shall be started to command the remote shell.
 
 Note that this is technically a "reverse shell" which gives access to your system!
 
+### Remote AI Prompt
+
+```
+  tea2adt -l
+```
+then enter and confirm password
+
+On the other device a chat shall be started to interact with the remote AI prompt.
+
+With this option you may remotely access your local, secure, and self-hosted AI (like ollama) in a secure way!
+
 ### File Transfer
 
 ```
@@ -104,6 +115,8 @@ The most important settings are:
 * volume_microphone
 * volume_speaker_left
 * volume_speaker_right
+* llm_cmd
+* text_to_speech
 
 ## How to use (git installation)
 When installed with git, tea2adt may be called with: 
@@ -120,7 +133,7 @@ For more information check the [documentation](https://github.com/ClarkFieseln/t
 ## Features
 on top of the audio modem provided by minimodem and encryption provided by GPG, tea2adt offers a reliable transport layer and many other features:
 
-- modes: chat, remote-shell, file transfer (future: sniffer)
+- modes: chat, remote-shell, remote-AI-prompt, file transfer (future: sniffer)
   
 - text-to-speech (TTS): synthesize speech from the text received in the chat
 
