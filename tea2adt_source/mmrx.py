@@ -24,7 +24,8 @@ import re
     [init]
     [init_ack_chat]
     [init_ack_shell]
-    [init_ack_file]    
+    [init_ack_llm]
+    [init_ack_file]
     [keepalive]
     <probe>
     <start_msg>
@@ -47,9 +48,12 @@ TX_SENDING = False
 TTS_OUT = False
 SESSION_ESTABLISHED = False
 SHELL_OUTPUT_READ_TIMEOUT_SEC = 1
+LLM_OUTPUT_READ_TIMEOUT_SEC = 1
 NEED_ACK = False
 WAITING_FOR_COMMAND_OUTPUT = False
+WAITING_FOR_LLM_OUTPUT = False
 START_MSG = ""
+SPEAKING = False
 
 
 
@@ -61,8 +65,10 @@ def main():
     global TTS_OUT
     global SESSION_ESTABLISHED
     global WAITING_FOR_COMMAND_OUTPUT
+    global WAITING_FOR_LLM_OUTPUT
     global NEED_ACK
     global START_MSG
+    global SPEAKING
     
     # local variables
     #################
@@ -72,7 +78,7 @@ def main():
     file_name = ""
     RND_MAX_DELAY_MS = 1000
     AVG_RND_DELAY_SEC = (RND_MAX_DELAY_MS/2000.0)
-    pattern = r'(?<=\?\ |\!\ |\:\ )'  # pattern = r'(?<=\?\ |\!\ |\:\ |\!... )'
+    pattern = r'(?<=\?\ |\!\ |\:\ |\.\ )'  # |\...\ )' ?
     
     # definitions
     #############
@@ -95,9 +101,11 @@ def main():
     #######################
     HALF_DUPLEX = False
     REMOTE_SHELL = False
+    LLM = False
     FILE_TRANSFER = False
     RETRANSMISSION_TIMEOUT_SEC = 3.5
     SHELL_OUT_MAX_DELAY = 2.75
+    LLM_OUT_MAX_DELAY = 2.75
     SEND_DELAY_SEC = 0.1
     ARMOR = "" # "--armor"
     SHOW_RX_PROMPT = False
@@ -116,6 +124,7 @@ def main():
     LOG_TO_FILE = False
     PIPE_SHELL_IN = HOME+TMP_PATH+"/tmp/pipe_shell_in"
     PIPE_SHELL_OUT = HOME+TMP_PATH+"/tmp/pipe_shell_out"
+    PIPE_LLM_OUT = HOME+TMP_PATH+"/tmp/pipe_llm_out"
     PIPE_FILE_IN = HOME+TMP_PATH+"/tmp/pipe_file_in"
     TMPFILE_BASE64_IN=HOME+TMP_PATH+"/tmp/in.64"
 
@@ -143,9 +152,11 @@ def main():
         HALF_DUPLEX = True
     f.close()
     print("half_duplex = " + str(HALF_DUPLEX))
-    # remote shell or file transfer? otherwise we use chat per default
+    # llm, remote shell or file transfer? otherwise we use chat per default
     if len(sys.argv) > 2:
-        if sys.argv[2] == "-s" or sys.argv[2] == "--rs" or sys.argv[2] == "--remote-shell" or sys.argv[2] == "--reverse-shell":
+        if sys.argv[2] == "-l" or sys.argv[2] == "--llm" or sys.argv[2] == "--llm-chat" or sys.argv[2] == "--llm-prompt":
+            LLM = True
+        elif sys.argv[2] == "-s" or sys.argv[2] == "--rs" or sys.argv[2] == "--remote-shell" or sys.argv[2] == "--reverse-shell":
             REMOTE_SHELL = True
         elif sys.argv[2] == "-f" or sys.argv[2] == "--file" or sys.argv[2] == "--file-transfer":
             FILE_TRANSFER = True
@@ -316,7 +327,7 @@ def main():
     if f.read().splitlines()[0] == "true":
         SESSION_ESTABLISHED = True
     f.close()
-    if REMOTE_SHELL:
+    if REMOTE_SHELL or LLM:
         # force session not yet established
         SESSION_ESTABLISHED = False
         f = open(SESSION_ESTABLISHED_FILE, "w")
@@ -374,6 +385,9 @@ def main():
             messageQueue.put(START_MSG)                
         messageQueue.put(message)
         
+    def llm_input(prompt_input):
+        promptInputQueue.put(prompt_input)
+        
     def check_tts():
         f = open(TTS_OUT_FILE, "r")
         tts_out = f.read().splitlines()[0]
@@ -381,7 +395,31 @@ def main():
             TTS_OUT = True
         elif tts_out == "false":
             TTS_OUT = False            
-        f.close()         
+        f.close()
+        
+    # thread to pass prompt input to LLM
+    ####################################
+    def PassPromptInputToLlmThread():
+        global SPEAKING
+        # main thread loop
+        ##################
+        while run_thread:
+            # block until a prompt input is written to the queue
+            input = promptInputQueue.get(block=True)
+            # wait first for prompt input to be spoken
+            if TTS:
+                while SPEAKING:
+                    sleep(TIMEOUT_POLL_SEC)
+            # write input to LLM via tmux in order to maintain the session
+            command = "".join(["tmux send-keys -t session_llm \"", decrypted_data, "\" Enter"])
+            p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
+            out, err = p1.communicate()                                        
+            if p1.returncode == 0:
+                p1.terminate()
+                p1.kill()
+            else:
+                logging.warning("could not send input to LLM!")  
+            logging.debug("Input for LLM sent to model.")           
 
     # thread to transmit minimodem message
     # (without encryption and seq. nr.)
@@ -429,9 +467,9 @@ def main():
                     p1.kill()
             TX_SENDING = False                        
                 
-    if REMOTE_SHELL or FILE_TRANSFER:
-        # shell: need to send ACKs here because a user input does not always produce a shell output
-        # thus no mmshellout.sh gets called and thus no AKCs are sent
+    if REMOTE_SHELL or FILE_TRANSFER or LLM:
+        # shell, llm: need to send ACKs here because a user input does not always produce a session output
+        # thus no mmsessionout.sh gets called and thus no AKCs are sent
         # file: for file transfers the RX process is responsible to send ACKs
         def transmit_ack():
             ackQueue.put("*")
@@ -468,43 +506,169 @@ def main():
                     p1.kill()
                     logging.info("> [ack]")
                 TX_SENDING = False
-    else:
+                
+    # TTS only for chat or LLM
+    if not REMOTE_SHELL and not FILE_TRANSFER:
+    
         def tts(data):
             ttsQueue.put(data)
+            
+        def tts_speak():
+            text = ttsQueue.get(block=True)
+            # TTS out
+            # add quotes around the data in case it contains spaces
+            # TODO: catch if odd number of " characters in text and do something (remove/replace or supress error output)
+            command = "".join(["./tts.sh \"", text, "\""])
+            if VERBOSE:
+                # stdout to see VERBOSE text from tts.sh                        
+                p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
+            else:
+                p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
+            out, err = p1.communicate()
+            if p1.returncode == 0:
+                p1.terminate()
+                p1.kill()
+            # make a pause after we speak
+            # pause is proportial to the estimated time needed to speak to the end
+            # TODO: adapt if required e.g. when calling espeak -s 110 which is slower than default 150 and thus takes longer
+            sleep(0.5 + 0.1*len(text))
             
         # thread to output text-to-speech
         #################################
         def TtsThread():
             global TTS_OUT
+            global SPEAKING
             # main thread loop
             ##################
             while run_thread:
                 # block until something is input to the queue
-                text = ttsQueue.get(block=True)
+                #text = ttsQueue.get(block=True)
+                while ttsQueue.empty():
+                    sleep(TIMEOUT_POLL_SEC)
                 # check flag
                 check_tts()
                 # avoid collissions when speaking a split sentence
                 while TTS_OUT:
                     check_tts()
-                    sleep(0.1)                               
-                # TTS out
-                # add single quotes around the data in case it contains spaces   
-                command = "".join(["./tts.sh '", text, "'"])
-                if VERBOSE:
-                    # stdout to see VERBOSE text from tts.sh                        
-                    p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
-                else:
-                    p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
-                out, err = p1.communicate()
-                if p1.returncode == 0:
-                    p1.terminate()
-                    p1.kill()
-                # make a pause after we speak
-                # pause is proportial to the estimated time needed to speak to the end
-                # TODO: adapt if required e.g. when calling espeak -s 100 which is slower and thus takes longer
-                sleep(0.5 + 0.075*len(text))
-                          
-    if REMOTE_SHELL:                
+                    sleep(0.1)
+                # set flag
+                SPEAKING = True
+                # speak all inputs in queue
+                while ttsQueue.empty() == False:
+                    tts_speak()
+                # clear flag
+                SPEAKING = False
+      
+    if LLM:                
+        # thread to gather and transmit output from LLM    
+        ###############################################
+        def LLMTransmitThread():
+            global TX_SENDING
+            global SESSION_ESTABLISHED
+            global WAITING_FOR_LLM_OUTPUT
+            global NEED_ACK
+            # main thread loop
+            ##################
+            while run_thread:
+                # block until data in queue
+                while llmOutputQueue.empty():
+                    sleep(TIMEOUT_POLL_SEC)
+                # initialize buffer, flags and counters
+                llm_output = ""
+                llm_timeout = False
+                read_lines = 0
+                start_time = datetime.datetime.now()
+                # consume all LLM output lines up to SPLIT_TX_LINES or timeout LLM_OUTPUT_READ_TIMEOUT_SEC
+                # exit when SPLIT_TX_LINES or LLM_OUTPUT_READ_TIMEOUT_SEC even if there are still data in the queue
+                # this makes sure we send for now at least a partial response to the remote caller
+                while (llmOutputQueue.empty() == False) and (read_lines < SPLIT_TX_LINES) and (llm_timeout == False):
+                    try:
+                        llm_output_part = llmOutputQueue.get(block=True, timeout=LLM_OUTPUT_READ_TIMEOUT_SEC)
+                        # append data
+                        if llm_output_part != None:
+                            llm_output = "".join([llm_output, llm_output_part])
+                            read_lines = read_lines + 1                    
+                        # timeout?
+                        end_time = datetime.datetime.now()
+                        delta_time = (end_time - start_time).total_seconds()
+                        if delta_time > LLM_OUTPUT_READ_TIMEOUT_SEC:
+                            llm_timeout = True                    
+                    except Exception as e:
+                        logging.exception("Exception in llmOutputQueue: " + str(e))
+                # some checks
+                if SESSION_ESTABLISHED and llm_output != "":
+                    # reset flag
+                    if NEED_ACK:
+                        WAITING_FOR_LLM_OUTPUT = False
+                    # escape special characters                
+                    llm_output_printable = llm_output
+                    llm_output = llm_output.replace("\n", "\r")
+                    llm_output = llm_output.replace("(", "\\(")
+                    llm_output = llm_output.replace(")", "\\)")
+                    llm_output = llm_output.replace("�", "\\�")                    
+                    llm_output = llm_output.replace("'", "\\'")
+                    llm_output = llm_output.replace('"', '\\"')
+                    # avoid collissions
+                    while TX_SENDING:
+                        sleep(TIMEOUT_POLL_SEC)
+                    # send data
+                    TX_SENDING = True
+                    # add quotes around the password in case it contains spaces        
+                    command = "".join(["./mmsessionout.sh \"", PASSWORD, "\" ", llm_output])
+                    if VERBOSE:
+                        # stdout to see VERBOSE text from mmsessionout.sh
+                        p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
+                    else:
+                        p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
+                    out, err = p1.communicate()                
+                    if p1.returncode == 0:
+                        p1.terminate()
+                        p1.kill()
+                        # show LLM output in prompt
+                        ###########################
+                        if SHOW_TX_PROMPT:
+                            print("> " + llm_output_printable, end='')
+                        else:                                                                
+                            print(llm_output_printable, end='')                                          
+                    TX_SENDING = False
+            
+        # thread to get output from LLM
+        ###############################
+        def LLMOutputThread():        
+            # llm output fifo
+            #################
+            # Open read end of pipe. Open this in non-blocking mode since otherwise it
+            # may block until another process/threads opens the pipe for writing.
+            pipe_llm_out = os.open(PIPE_LLM_OUT, os.O_RDONLY | os.O_NONBLOCK)
+            # read pipe_llm_out
+            ###################
+            # TODO: check why this is not working,
+            #       with grep -v we get only the responses from the LLM:
+            #       cmd_to_read_pipe_llm_out = "".join(["cat ", PIPE_LLM_OUT, " | grep -v '>>>'"])
+            cmd_to_read_pipe_llm_out = "".join(["cat ", PIPE_LLM_OUT])
+            proc = subprocess.Popen(cmd_to_read_pipe_llm_out,
+                                    shell=True,
+                                    stdin=pipe_llm_out,
+                                    stderr=subprocess.PIPE,  # stderr=subprocess.DEVNULL,
+                                    stdout=subprocess.PIPE,
+                                    text=True)
+            # main loop
+            ###########
+            while run_thread:
+                llm_output_part = proc.stdout.readline()
+                # TODO: check cmd_to_read_pipe_llm_out using grep above and then use this line
+                # if (llm_output_part != "") and (llm_output_part != "\n"):
+                if (llm_output_part != "") and (llm_output_part != "\n") and (">>>" not in llm_output_part):
+                    llmOutputQueue.put(llm_output_part)
+            # clean up
+            ##########
+            proc.terminate()
+            proc.wait(timeout=0.2)
+            # Close read end of pipe since it is not used in the parent process.
+            os.close(pipe_llm_out)
+            os.unlink(PIPE_LLM_OUT)
+            
+    elif REMOTE_SHELL:                
         # thread to gather and transmit output from shell    
         #################################################
         def ShellTransmitThread():
@@ -517,14 +681,12 @@ def main():
             while run_thread:
                 # block until data in queue
                 while shellOutputQueue.empty() == True:
-                    sleep(TIMEOUT_POLL_SEC)         
-                           
+                    sleep(TIMEOUT_POLL_SEC)
                 # initialize buffer, flags and counters
                 shell_output = ""
                 shell_timeout = False
                 read_lines = 0
-                start_time = datetime.datetime.now()   
-                         
+                start_time = datetime.datetime.now()
                 # consume all shell output lines up to SPLIT_TX_LINES or timeout SHELL_OUTPUT_READ_TIMEOUT_SEC
                 # exit when SPLIT_TX_LINES or SHELL_OUTPUT_READ_TIMEOUT_SEC even if there are still data in the queue
                 # this makes sure we send for now at least a partial response to the remote caller
@@ -541,8 +703,7 @@ def main():
                         if delta_time > SHELL_OUTPUT_READ_TIMEOUT_SEC:
                             shell_timeout = True                    
                     except Exception as e:
-                        logging.exception("Exception in shellOutputQueue: " + str(e))  
-                                      
+                        logging.exception("Exception in shellOutputQueue: " + str(e))
                 # some checks
                 if SESSION_ESTABLISHED and shell_output != "":
                     # reset flag
@@ -550,23 +711,23 @@ def main():
                         WAITING_FOR_COMMAND_OUTPUT = False
                     # prepare data for transmission as a "block" (otherwise we would send each line separately)
                     shell_output_printable = shell_output
-                    shell_output = shell_output.replace("\n", "\r")                
+                    shell_output = shell_output.replace("\n", "\r")
                     # TODO: find out why we get characters that are not allowed in file names
                     #       and extend this workaround to further characters like *, ?, >, <, :, |, ...
                     #       check e.g. https://stackoverflow.com/questions/4814040/allowed-characters-in-filename
                     shell_output = shell_output.replace("(", "\\(")
                     shell_output = shell_output.replace(")", "\\)")
-                    shell_output = shell_output.replace("�", "\�")
-                    shell_output = shell_output.replace("'", "\'")
+                    shell_output = shell_output.replace("�", "\\�")
+                    shell_output = shell_output.replace("'", "\\'")
                     # avoid collissions
                     while TX_SENDING:
                         sleep(TIMEOUT_POLL_SEC)
                     # send data
                     TX_SENDING = True
-                    # add single quotes around the password in case it contains spaces        
-                    command = "".join(["./mmshellout.sh '", PASSWORD, "' ", shell_output])
+                    # add quotes around the password in case it contains spaces        
+                    command = "".join(["./mmsessionout.sh \"", PASSWORD, "\" ", shell_output])
                     if VERBOSE:
-                        # stdout to see VERBOSE text from mmshellout.sh
+                        # stdout to see VERBOSE text from mmsessionout.sh
                         p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
                     else:
                         p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
@@ -594,20 +755,18 @@ def main():
             pipe_shell_out = os.open(PIPE_SHELL_OUT, os.O_RDONLY | os.O_NONBLOCK)
             # execute cat pipe_shell_out
             ############################
-            proc = subprocess.Popen('cat '+PIPE_SHELL_OUT, 
-                                    shell=True, 
+            proc = subprocess.Popen('cat '+PIPE_SHELL_OUT,
+                                    shell=True,
                                     stdin=pipe_shell_out,
                                     stderr=subprocess.PIPE,
                                     stdout=subprocess.PIPE,
-                                    text=True)    
+                                    text=True)
             # main loop
-            ###########          
-            while run_thread:        
-                shell_output_part = proc.stdout.readline()                                                                    
-                # put shell output part in queue to be gathered and sent in separate thread
-                if shell_output_part != "":            
+            ###########
+            while run_thread:
+                shell_output_part = proc.stdout.readline()
+                if shell_output_part != "":
                     shellOutputQueue.put(shell_output_part)
-                
             # clean up
             ##########
             proc.terminate()
@@ -618,10 +777,14 @@ def main():
     
     # banner
     ########
-    if REMOTE_SHELL:
+    if LLM:
         print("******************************")
-        print("*** tea2adt remote shell ***")
+        print("*** tea2adt LLM prompt *******")
         print("******************************")
+    elif REMOTE_SHELL:
+        print("******************************")
+        print("*** tea2adt remote shell *****")
+        print("******************************")        
     elif FILE_TRANSFER:
         print("******************************************************")
         print("*** tea2adt file transfer receiver,")
@@ -629,7 +792,7 @@ def main():
         print("******************************************************")            
     else:
         print("******************************")
-        print("*** tea2adt chat receiver ***")
+        print("*** tea2adt chat receiver ****")
         print("******************************")
         
     # queues and threads
@@ -637,11 +800,26 @@ def main():
     messageQueue = queue.Queue()
     # start thread to transmit data
     transmitMinimodemThread = threading.Thread(name="TransmitMinimodemThread", target=TransmitMinimodemThread)
-    transmitMinimodemThread.start()     
+    transmitMinimodemThread.start()
+    promptInputQueue = queue.Queue()
+    # start thread to pass prompt input to LLM
+    passPromptInputToLlmThread = threading.Thread(name="PassPromptInputToLlmThread", target=PassPromptInputToLlmThread)
+    passPromptInputToLlmThread.start() 
 
+    # start threads for LLM
+    #######################
+    if LLM:
+        # queue for LLM output
+        llmOutputQueue = queue.Queue()
+        # start thread to gather and transmit output from LLM
+        llmTransmitThread = threading.Thread(name="LLMTransmitThread", target=LLMTransmitThread)
+        llmTransmitThread.start()
+        # start thread to get output from LLM
+        llmOutputThread = threading.Thread(name="LLMOutputThread", target=LLMOutputThread)
+        llmOutputThread.start()
     # start threads for remote shell
     ################################
-    if REMOTE_SHELL:
+    elif REMOTE_SHELL:
         # queue for shell output
         shellOutputQueue = queue.Queue()
         # pipe for shell in
@@ -656,13 +834,14 @@ def main():
         # pipe for file in
         pipe_file_in = os.open(PIPE_FILE_IN, os.O_WRONLY)
     # common ressources
-    if REMOTE_SHELL or FILE_TRANSFER:
+    if REMOTE_SHELL or FILE_TRANSFER or LLM:
         # queue for ACKs
         ackQueue = queue.Queue()
         # start thread to transmit ack
         transmitAckThread = threading.Thread(name="TransmitAckThread", target=TransmitAckThread)
         transmitAckThread.start()
-    else:
+    # TTS only for chat and LLM
+    if not REMOTE_SHELL and not FILE_TRANSFER:
         # queue for text
         ttsQueue = queue.Queue()
         # start thread to speak text
@@ -671,7 +850,7 @@ def main():
         
     # wait for transmitter to start?
     ################################
-    if (TRANSMITTER_STARTED == True) or (REMOTE_SHELL == True):
+    if (TRANSMITTER_STARTED == True) or (REMOTE_SHELL == True) or (LLM == True):
         pass
     else:
         print("Waiting for transmitter to start...")
@@ -686,6 +865,8 @@ def main():
     ################      
     if REMOTE_SHELL:
         print("Remote shell started...")
+    elif LLM:
+        print("LLM prompt started...")
     print("Waiting for session to be established...")
         
     # clear session flags and counters
@@ -712,8 +893,18 @@ def main():
             data = ""
             data_encoded = ""
             while data == "":
-                try:            
-                    if REMOTE_SHELL and NEED_ACK and WAITING_FOR_COMMAND_OUTPUT:
+                try:
+                    if LLM and NEED_ACK and WAITING_FOR_LLM_OUTPUT:
+                        if select.select([sys.stdin,],[],[],LLM_OUT_MAX_DELAY)[0]:
+                            data = sys.stdin.readline()
+                        else:         
+                            # send [ack]
+                            ############
+                            # when remote shell has no output we need to send the ack here
+                            if SESSION_ESTABLISHED and WAITING_FOR_LLM_OUTPUT:
+                                WAITING_FOR_LLM_OUTPUT = False
+                                transmit_ack()                
+                    elif REMOTE_SHELL and NEED_ACK and WAITING_FOR_COMMAND_OUTPUT:
                         if select.select([sys.stdin,],[],[],SHELL_OUT_MAX_DELAY)[0]:
                             data = sys.stdin.readline()
                         else:         
@@ -723,7 +914,7 @@ def main():
                             if SESSION_ESTABLISHED and WAITING_FOR_COMMAND_OUTPUT:
                                 WAITING_FOR_COMMAND_OUTPUT = False
                                 transmit_ack()
-                    elif (REMOTE_SHELL or FILE_TRANSFER) and (KEEPALIVE_TIME_SEC_F != 0.0):
+                    elif (REMOTE_SHELL or FILE_TRANSFER or LLM) and (KEEPALIVE_TIME_SEC_F != 0.0):
                         # note: we subtract the average random delay from KEEPALIVE_TIME_SEC_F
                         if select.select([sys.stdin,],[],[],(KEEPALIVE_TIME_SEC_F - AVG_RND_DELAY_SEC))[0]:
                             data = sys.stdin.readline()
@@ -763,7 +954,7 @@ def main():
                     # '''
                     stdin_err_cnt = stdin_err_cnt + 1
                     logging.info("".join(["< binary data! count = ", str(stdin_err_cnt)]))
-                    # if we receive too many consecutive "binary bytes" the program hangs!
+                    # if we receive too many consecutive bytes the program hangs!
                     # by introducing this small delay we seem to prevent that
                     sleep(0.01)
 
@@ -799,7 +990,9 @@ def main():
             if data_encoded != "":
                 if "[init]" in data_encoded:
                     if SESSION_ESTABLISHED == False:
-                        if REMOTE_SHELL:
+                        if LLM:
+                            print("LLM prompt session initiated by communication partner is now established!")
+                        elif REMOTE_SHELL:
                             print("Remote shell session initiated by communication partner is now established!")
                         elif FILE_TRANSFER:
                             print("File transfer session initiated by communication partner is now established!")
@@ -808,7 +1001,9 @@ def main():
                     init_session() 
                     logging.info("< [init]")
                     # send init_ack
-                    if REMOTE_SHELL:
+                    if LLM:
+                        minimodem_tx("[init_ack_llm]")
+                    elif REMOTE_SHELL:
                         minimodem_tx("[init_ack_shell]")
                     elif FILE_TRANSFER:
                         minimodem_tx("[init_ack_file]")
@@ -828,7 +1023,12 @@ def main():
                     if SESSION_ESTABLISHED == False:
                         print("Remote shell session initiated locally is now established!")            
                     init_session()
-                    logging.info("< [init_ack_shell]")                                            
+                    logging.info("< [init_ack_shell]")
+                elif "[init_ack_llm]" in data_encoded:
+                    if SESSION_ESTABLISHED == False:
+                        print("LLM session initiated locally is now established!")
+                    init_session()
+                    logging.info("< [init_ack_llm]")
                 elif "[keepalive]" in data_encoded:
                     logging.info("< [keepalive]")
                 elif "[test]" in data_encoded:
@@ -921,7 +1121,7 @@ def main():
                                         f.write(seq_tx_str)
                                         f.close()
                                         logging.debug("received seq_tx = "+seq_tx_str+", now stored as seq_rx to be transmitted/acknowledged next time")                                
-                                        # in case of remote shell we need to send ACK here (just in case the shell has no output, thus no mmshellout.sh is called)                                    
+                                        # in case of remote shell we need to send ACK here (just in case the shell has no output, thus no mmsessionout.sh is called)                                    
                                         
                                         # new [data] message?
                                         #####################
@@ -935,27 +1135,45 @@ def main():
                                                 # show input data with RX prompt
                                                 ################################
                                                 if SHOW_RX_PROMPT:
-                                                    str_tmp = decrypted_data.replace("\n", "\n  ")
                                                     if VERBOSE:
-                                                        print("< [" + f"{seq_tx:02d}" + "," + f"{seq_tx_acked:02d}" + "] " + str_tmp, flush=True)
+                                                        print("< [" + f"{seq_tx:02d}" + "," + f"{seq_tx_acked:02d}" + "] " + decrypted_data, flush=True)
                                                     else:
-                                                        print("".join(["< ", str_tmp]), flush=True)
+                                                        print("".join(["< ", decrypted_data]), flush=True)
                                                 else:                                        
                                                     print(decrypted_data)
+  
+                                                # LLM?
+                                                ######
+                                                if LLM:
+                                                    # set flag to transmit ACK on timeout
+                                                    if NEED_ACK:
+                                                        WAITING_FOR_LLM_OUTPUT = True
+                                                    # set flag in advance to know we need prompt input to be spoken first
+                                                    if TTS and not SPEAKING:
+                                                        SPEAKING = True
+                                                    # pass prompt input to LLM
+                                                    llm_input(decrypted_data)
                                                     
-                                                # remote shell enabled?
-                                                ########################
-                                                if REMOTE_SHELL:
+                                                # remote shell?
+                                                ###############
+                                                elif REMOTE_SHELL:
+                                                    # set flag to transmit ACK on timeout
+                                                    if NEED_ACK:
+                                                        WAITING_FOR_COMMAND_OUTPUT = True
                                                     # write input command to pipe_shell_in
                                                     os.write(pipe_shell_in, bytes("".join([decrypted_data, '\n']), 'utf-8'))
                                                     logging.debug("Shell output sent.")
-                                                # test to speech?
+                                                    
+                                                # text to speech?
                                                 #################
-                                                elif TTS:                                                
-                                                    # NOTE: text with pauses as defined in pattern requires a separate call each time
-                                                    decrypted_data_list = re.split(pattern, decrypted_data)                                                                                                        
-                                                    for index, sentence in enumerate(decrypted_data_list, 1):
-                                                        tts(f"{sentence.strip()}")
+                                                if TTS:
+                                                    # NOTE: if the communication parter is running a shell then our REMOTE_SHELL will still be False (deactivate TTS in cfg/text_to_speech if required)
+                                                    if not REMOTE_SHELL and not FILE_TRANSFER:
+                                                        # NOTE: text with pauses as defined in pattern requires a separate call each time
+                                                        decrypted_data_list = re.split(pattern, decrypted_data)
+                                                        for index, sentence in enumerate(decrypted_data_list, 1):
+                                                            tts(f"{sentence.strip()}")
+                                                            
                                             # empty data
                                             else:                                        
                                                 logging.info("< empty_data["+seq_tx_str+","+seq_tx_acked_str+"]")
@@ -963,10 +1181,6 @@ def main():
                                         else:
                                             str_tmp = decrypted_data.replace("\n", "\n  ")
                                             logging.info("< repeated_data["+seq_tx_str+","+seq_tx_acked_str+"] = " + str_tmp)
-                                        # set flag to transmit ACK on timeout
-                                        #####################################
-                                        if REMOTE_SHELL and NEED_ACK:
-                                            WAITING_FOR_COMMAND_OUTPUT = True
                                     # FILE
                                     ######
                                     elif out[2:13] == "[file_name]":
