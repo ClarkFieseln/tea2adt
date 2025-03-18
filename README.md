@@ -237,8 +237,8 @@ Text-to-speech demo video: https://www.youtube.com/watch?v=-ikTdBzhCSw&list=PLX2
 
 ## Remote AI Prompt
 
-<!-- # ![plot](./img/tts.jpg) -->
-[![Text-to-speech](https://raw.githubusercontent.com/ClarkFieseln/tea2adt/refs/heads/main/img/tts.jpg)](https://www.youtube.com/watch?v=6jYEBNAay64&list=PLX24fhcibpHXllvUgFUw6Ly9cwQcTcKac&index=1&pp=gAQBiAQB)
+<!-- # ![plot](./screenshots/20250318_161119.jpg) -->
+[![Text-to-speech](https://raw.githubusercontent.com/ClarkFieseln/tea2adt/refs/heads/main/screenshots/20250318_161119.jpg)](https://www.youtube.com/watch?v=6jYEBNAay64&list=PLX24fhcibpHXllvUgFUw6Ly9cwQcTcKac&index=1&pp=gAQBiAQB)
 
 With this option you may remotely access your local, secure, and self-hosted AI (like ollama) in a secure way!
 
