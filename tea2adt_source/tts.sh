@@ -1,7 +1,4 @@
 #!/bin/bash
-# configuration
-###############
-  # read tmp path
 TMP_PATH=$(head -n 1 cfg/tmp_path)
 TEXT_TO_SPEECH=$(head -n 1 ${HOME}${TMP_PATH}/cfg/text_to_speech)
 TTS_OUT_FILE="${HOME}${TMP_PATH}/state/tts_out"
@@ -14,9 +11,9 @@ if [ "${TEXT_TO_SPEECH}" != "" ] ; then
     # argument
     TEXT="$1"
     if [[ ${TEXT_TO_SPEECH} =~ "festival" ]]; then
-      WAIT_START_TTS_SEC=0.3
+      WAIT_START_TTS_SEC=0.40  # 0.30
     elif [[ ${TEXT_TO_SPEECH} =~ "espeak" ]]; then
-      WAIT_START_TTS_SEC=0.75
+      WAIT_START_TTS_SEC=0.65  # 0.75
     fi
     # text-to-speech:
     $(echo ${TEXT} | ${TEXT_TO_SPEECH}) &
