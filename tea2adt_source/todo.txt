@@ -1,14 +1,25 @@
+- mmrx.py:
+ replace roc = subprocess.Popen('cat '+PIPE_SHELL_OUT
+  with "".join and quotes "cat ..
+- processing of character ":
+  - in chat with LLM (if " is not closed then we have a prboblem!)
+  - in TTS output (?)
+  - also in shell or file-transfer (?)
+- WAIT_START_TTS_SEC:
+  this delay used in tts.h and adapted depending on the configured TTS tool
+  is too sensitive to system conditions, i.e. in some cases it may not work as expected
+  due to slight mismatch with the actual delay introduced by the tools
+  Besides, it is critical to wait long enough for the process to start but then 'right afterwards'
+  switch to the corresponding interface.
+  If we dont wait long enough then we dont find the index of the process, but if we wait to long, then we don't hear all the text.
+  *** gather information, e.g. from latency in pactl list sinks, to configure this value
+      or find set somehow a fix output to the tool (currently not possible as it is executed with a new index every time)
+      If necessary add a new configuration seting, e.g. tts_start_delay
 - TTS:
   check how to make this work in Termux
 - STT: 
   implement it or document how to configure
 - offline AI prompt:
-  ------------------
-  use offline AI (e.g. ollama run llama3)
-  note: running ollama command in remote shell does not work (same problem as interactive python command)
-  possible implementation: 
-      use separate input and output pipes, and increase values of timeouts in mmrx.py: 
-      AI_OUTPUT_READ_TIMEOUT_SEC, AI_OUT_MAX_DELAY (similar to SHELL_... timeouts)
 - update screenshots and videos
 - GUI (option -g):
   - add sub-menus, e.g. showing selection options from available interfaces in order to set interface_index_tts_out
