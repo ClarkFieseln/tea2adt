@@ -8,6 +8,7 @@
     [init]
     [init_ack_chat]
     [init_ack_shell]
+    [init_ack_llm]
     [init_ack_file]    
     [keepalive]
     <probe>
