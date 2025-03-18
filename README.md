@@ -235,6 +235,15 @@ The text received in the chat is synthesized to speech and output to a separate 
 
 Text-to-speech demo video: https://www.youtube.com/watch?v=-ikTdBzhCSw&list=PLX24fhcibpHUx7ej_Tp4neobJUqOkqliN&index=10
 
+## Remote AI Prompt
+
+<!-- # ![plot](./img/tts.jpg) -->
+[![Text-to-speech](https://raw.githubusercontent.com/ClarkFieseln/tea2adt/refs/heads/main/img/tts.jpg)](https://www.youtube.com/watch?v=6jYEBNAay64&list=PLX24fhcibpHXllvUgFUw6Ly9cwQcTcKac&index=1&pp=gAQBiAQB)
+
+With this option you may remotely access your local, secure, and self-hosted AI (like ollama) in a secure way!
+
+Remote AI prompt, demo video: https://www.youtube.com/watch?v=6jYEBNAay64&list=PLX24fhcibpHXllvUgFUw6Ly9cwQcTcKac&index=1&pp=gAQBiAQB
+
 ## Limitations
 The data transfer is usually done at low rates, typical of audio systems. Therefore, this tool is not adequate to transmit big files which may take a long time to complete.
 
