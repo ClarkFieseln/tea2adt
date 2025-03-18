@@ -97,6 +97,11 @@ In my particular case the following tea2adt settings worked very well:
 - preamble, start_msg, end_msg: # all empty
 - retransmission_timeout_sec: 5.0
 
+## Tested features
+The following features have not yet been fully tested in termux and may not work in this environment:
+- text-to-speech
+- remote AI prompt
+  
 ## Hint
 In my configuration I used the app 'EZ Booster' on the smartphone running tea2adt on Termux in order to increase the output level of the speaker.
 
