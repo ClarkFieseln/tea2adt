@@ -1,2 +1,7 @@
-false
+
+# command to execute STT:
+# -----------------------
+# no command known yet
+#
+# if empty then STT is deactivated!
 # remember to also configure interface_index_stt_in and volume_stt_in
