@@ -1,8 +1,7 @@
 
-# command to execute TTS:
+# command to execute STT:
 # -----------------------
-# espeak -s 100
-# festival --tts
+# no command known yet
 #
-# if empty then TTS is deactivated!
-# remember to also configure interface_index_tts_out and volume_tts_out
+# if empty then STT is deactivated!
+# remember to also configure interface_index_stt_in and volume_stt_in
