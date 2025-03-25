@@ -81,8 +81,9 @@ def main():
             out, err = p1.communicate()
             if p1.returncode == 0:
                 p1.terminate()
-                p1.kill()
-        except:
+                p1.kill()        
+        except Exception as e:
+            logging.exception(str(e))
             # send the SIGTERM signal to all the process groups to terminate processes launched from here
             os.killpg(os.getpgid(p1.pid), SIGTERM)
     else:
