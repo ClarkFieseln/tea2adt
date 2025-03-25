@@ -44,8 +44,6 @@ NEED_ACK=$(head -n 1 ${HOME}${TMP_PATH}/cfg/need_ack)
 VERBOSE=$(head -n 1 ${HOME}${TMP_PATH}/cfg/verbose) # false
 SPLIT_TX_LINES=$(head -n 1 ${HOME}${TMP_PATH}/cfg/split_tx_lines)
 HALF_DUPLEX=$(head -n 1 ${HOME}${TMP_PATH}/cfg/half_duplex)
-# uncomment if set-source-volume is used i.o. set-source-mute in files tx.src and restore_mic.sh
-# VOLUME_MICROPHONE=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_microphone)
 MSGFILE="${HOME}${TMP_PATH}/tmp/msgtx.gpg"
 TMPFILE="${HOME}${TMP_PATH}/tmp/out.txt"
 
