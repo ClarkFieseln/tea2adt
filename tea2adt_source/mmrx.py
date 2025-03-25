@@ -15,6 +15,7 @@ import datetime
 import random
 import getopt
 import re
+import string
 
 
 
@@ -318,7 +319,65 @@ def main():
     elif LOGGING_LEVEL == logging.CRITICAL:
         print("logging_level = logging.CRITICAL")
     else:
-        print("logging_level = logging.WARNING")           
+        print("logging_level = logging.WARNING")
+        
+    # banner
+    ########
+    if LLM:
+        print("******************************")
+        print("*** tea2adt LLM prompt *******")
+        print("******************************")
+    elif REMOTE_SHELL:
+        print("******************************")
+        print("*** tea2adt remote shell *****")
+        print("******************************")        
+    elif FILE_TRANSFER:
+        print("******************************************************")
+        print("*** tea2adt file transfer receiver,")
+        print("*** the received files can be found in folder rx_files")
+        print("******************************************************")            
+    else:
+        print("******************************")
+        print("*** tea2adt chat receiver ****")
+        print("******************************")        
+        
+    # wait for transmitter to start?
+    ################################
+    if (TRANSMITTER_STARTED == True) or (REMOTE_SHELL == True) or (LLM == True):
+        pass
+    else:
+        print("Waiting for transmitter to start...")
+        while TRANSMITTER_STARTED == False:
+            f = open(TRANSMITTER_STARTED_FILE, "r")
+            if f.read().splitlines()[0] == "true":
+                TRANSMITTER_STARTED = True
+            f.close()
+            sleep(0.1)
+    
+    # prompt message
+    ################      
+    if REMOTE_SHELL:
+        print("Remote shell started...")
+    elif LLM:
+        print("LLM prompt started...")
+    print("Waiting for session to be established...")
+            
+    # SET_COMM_IFS
+    '''
+    # initialize audio interfaces
+    #############################
+    # NOTE: at this point minimodem --tx and --rx have been started, 
+    #       thus we can get the sink-input and source-output to then link them with the configured audio interface
+    command = "./set_interfaces.sh"
+    p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
+    out, err = p1.communicate()                                        
+    if p1.returncode == 0:
+        p1.terminate()
+        p1.kill()
+    else:
+        logging.warning("Could not initialize audio intefaces!")  
+    logging.debug("Audio interfaces set as configured.") 
+    '''
 
     # current state
     ###############
@@ -394,7 +453,7 @@ def main():
         if tts_out == "true":
             TTS_OUT = True
         elif tts_out == "false":
-            TTS_OUT = False            
+            TTS_OUT = False
         f.close()
         
     # thread to pass prompt input to LLM
@@ -405,13 +464,15 @@ def main():
         ##################
         while run_thread:
             # block until a prompt input is written to the queue
-            input = promptInputQueue.get(block=True)
+            prompt_input = promptInputQueue.get(block=True)
             # wait first for prompt input to be spoken
             if TTS:
                 while SPEAKING:
-                    sleep(TIMEOUT_POLL_SEC)
+                    sleep(TIMEOUT_POLL_SEC)                    
+            # WORKAROUND: works with ; but not with "*<   ...why?
+            prompt_input = prompt_input.replace(';', '\\;')  # 
             # write input to LLM via tmux in order to maintain the session
-            command = "".join(["tmux send-keys -t session_llm \"", decrypted_data, "\" Enter"])
+            command = "".join(["tmux send-keys -t session_llm \"", prompt_input, "\" Enter"])
             p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
             out, err = p1.communicate()                                        
             if p1.returncode == 0:
@@ -446,7 +507,11 @@ def main():
                     p1.terminate()
                     p1.kill()
             # minimodem --tx
-            command = "".join(["echo '", message, "' | minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 --sync-byte ", SYNC_BYTE, " --volume 1.0 ", BAUD])
+            command = "".join(["echo \"", message, "\" | minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 --sync-byte ", SYNC_BYTE, " --volume 1.0 ", BAUD])
+            # SET_COMM_IFS
+            # command = "".join(["tmux send-keys -t session_mmtx \"", message, "\" Enter"])
+            # alternative:
+            # command = "".join(["screen -S session_mmtx -X stuff \"", message, "^M\" Enter"])
             if VERBOSE:
                 # stdout to see VERBOSE text from minimodem
                 p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
@@ -457,9 +522,9 @@ def main():
                 p1.terminate()
                 p1.kill()
                 logging.info("> " + message)
-            # restore mic?
+            # unmute mic?
             if HALF_DUPLEX:         
-                command = "./restore_mic.sh"
+                command = "./unmute_mic.sh"
                 p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)        
                 out, err = p1.communicate()                                        
                 if p1.returncode == 0:
@@ -523,7 +588,7 @@ def main():
                 # stdout to see VERBOSE text from tts.sh                        
                 p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
             else:
-                p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
+                p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
             out, err = p1.communicate()
             if p1.returncode == 0:
                 p1.terminate()
@@ -600,14 +665,29 @@ def main():
                     # reset flag
                     if NEED_ACK:
                         WAITING_FOR_LLM_OUTPUT = False
-                    # escape special characters                
+                    # escape special characters: !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+                    # TODO: check why we get /bin/sh: 2: Syntax error: Unterminated quoted string when we use this code
+                    # create a translation table
+                    ## translation_table = str.maketrans({char: f'\\\\{char}' for char in string.punctuation})
+                    # apply the translation to the input string
+                    ## llm_output = llm_output.translate(translation_table)
+                    # use utf-8 in LLMOutputThread() instead?
+                    # for now replace problematic characters explicitely
                     llm_output_printable = llm_output
                     llm_output = llm_output.replace("\n", "\r")
                     llm_output = llm_output.replace("(", "\\(")
                     llm_output = llm_output.replace(")", "\\)")
                     llm_output = llm_output.replace("�", "\\�")                    
                     llm_output = llm_output.replace("'", "\\'")
-                    llm_output = llm_output.replace('"', '\\"')
+                    # llm_output = llm_output.replace('"', '\\"')  # ?
+                    llm_output = llm_output.replace('|', '\\|')
+                    llm_output = llm_output.replace('#', '\\#')
+                    llm_output = llm_output.replace('&', '\\&')
+                    # llm_output = llm_output.replace('*', '\\*')  # ?
+                    llm_output = llm_output.replace(';', '\\;')  # ?
+                    llm_output = llm_output.replace('<', '\\<')  # ?
+                    llm_output = llm_output.replace('>', '\\>')
+                    # llm_output = llm_output.replace('\', '\\\')  # ?
                     # avoid collissions
                     while TX_SENDING:
                         sleep(TIMEOUT_POLL_SEC)
@@ -755,7 +835,8 @@ def main():
             pipe_shell_out = os.open(PIPE_SHELL_OUT, os.O_RDONLY | os.O_NONBLOCK)
             # execute cat pipe_shell_out
             ############################
-            proc = subprocess.Popen('cat '+PIPE_SHELL_OUT,
+            command = "".join(["cat ", PIPE_SHELL_OUT])
+            proc = subprocess.Popen(command,
                                     shell=True,
                                     stdin=pipe_shell_out,
                                     stderr=subprocess.PIPE,
@@ -773,27 +854,7 @@ def main():
             proc.wait(timeout=0.2)
             # Close read end of pipe since it is not used in the parent process.
             os.close(pipe_shell_out)
-            os.unlink(PIPE_SHELL_OUT)       
-    
-    # banner
-    ########
-    if LLM:
-        print("******************************")
-        print("*** tea2adt LLM prompt *******")
-        print("******************************")
-    elif REMOTE_SHELL:
-        print("******************************")
-        print("*** tea2adt remote shell *****")
-        print("******************************")        
-    elif FILE_TRANSFER:
-        print("******************************************************")
-        print("*** tea2adt file transfer receiver,")
-        print("*** the received files can be found in folder rx_files")
-        print("******************************************************")            
-    else:
-        print("******************************")
-        print("*** tea2adt chat receiver ****")
-        print("******************************")
+            os.unlink(PIPE_SHELL_OUT)
         
     # queues and threads
     ####################
@@ -847,27 +908,6 @@ def main():
         # start thread to speak text
         ttsThread = threading.Thread(name="TtsThread", target=TtsThread)
         ttsThread.start()
-        
-    # wait for transmitter to start?
-    ################################
-    if (TRANSMITTER_STARTED == True) or (REMOTE_SHELL == True) or (LLM == True):
-        pass
-    else:
-        print("Waiting for transmitter to start...")
-        while TRANSMITTER_STARTED == False:
-            f = open(TRANSMITTER_STARTED_FILE, "r")
-            if f.read().splitlines()[0] == "true":
-                TRANSMITTER_STARTED = True
-            f.close()
-            sleep(0.1)
-    
-    # prompt message
-    ################      
-    if REMOTE_SHELL:
-        print("Remote shell started...")
-    elif LLM:
-        print("LLM prompt started...")
-    print("Waiting for session to be established...")
         
     # clear session flags and counters
     ##################################
@@ -1151,8 +1191,16 @@ def main():
                                                     # set flag in advance to know we need prompt input to be spoken first
                                                     if TTS and not SPEAKING:
                                                         SPEAKING = True
-                                                    # pass prompt input to LLM
-                                                    llm_input(decrypted_data)
+                                                    # leave session?
+                                                    # TODO: this is ollama-specific
+                                                    #       implement here something generic, for now we use this as a general special code to leave
+                                                    # leave LLM?
+                                                    if decrypted_data == "/bye":
+                                                        # generate Ctrl+C 
+                                                        raise KeyboardInterrupt()
+                                                    else:
+                                                        # pass prompt input to LLM
+                                                        llm_input(decrypted_data)
                                                     
                                                 # remote shell?
                                                 ###############
@@ -1312,13 +1360,19 @@ def main():
             sleep(0.5)
             # output new line, otherwise terminal prompt glued to last text
             print("")
-            # WORKAROUND
+            # restore mic volume
+            command = "./restore_audio_settings.sh &"
+            p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
+            out, err = p1.communicate()
+            if p1.returncode == 0:
+                p1.terminate()
+                p1.kill()
             # brute-force cleanup
-            # TODO: is there a nicer way to clean up here?
-            #       or just remove, now we terminate processes with SIGTERM in tea2adt.py
+            #     we could remove this code, as we terminate processes with SIGTERM in tea2adt.py
+            #     but then running ./tea2adt directly would not cleanup anymore
             command = "./killtea2adt.sh 2> /dev/null &"
             p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
-            out, err = p1.communicate()                                        
+            out, err = p1.communicate()
             if p1.returncode == 0:
                 p1.terminate()
                 p1.kill()
