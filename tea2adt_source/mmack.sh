@@ -35,8 +35,6 @@ SYNCBYTE=$(head -n 1 ${HOME}${TMP_PATH}/cfg/syncbyte)
 NEED_ACK=$(head -n 1 ${HOME}${TMP_PATH}/cfg/need_ack)
 VERBOSE=$(head -n 1 ${HOME}${TMP_PATH}/cfg/verbose)
 HALF_DUPLEX=$(head -n 1 ${HOME}${TMP_PATH}/cfg/half_duplex)
-# uncomment if set-source-volume is used i.o. set-source-mute in files tx.src and restore_mic.sh
-# VOLUME_MICROPHONE=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_microphone)
 MSGFILE="${HOME}${TMP_PATH}/tmp/msgtx.gpg"
 TMPFILE="${HOME}${TMP_PATH}/tmp/out.txt"
 INVALID_SEQ_NR=200
