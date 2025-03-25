@@ -1,45 +1,30 @@
-- mmrx.py:
- replace roc = subprocess.Popen('cat '+PIPE_SHELL_OUT
-  with "".join and quotes "cat ..
-- processing of character ":
-  - in chat with LLM (if " is not closed then we have a prboblem!)
+- processing of characters ",*,etc.:
+  - in chat with LLM (if " is not closed then we have a problem!)
   - in TTS output (?)
   - also in shell or file-transfer (?)
-- WAIT_START_TTS_SEC:
-  this delay used in tts.h and adapted depending on the configured TTS tool
-  is too sensitive to system conditions, i.e. in some cases it may not work as expected
-  due to slight mismatch with the actual delay introduced by the tools
-  Besides, it is critical to wait long enough for the process to start but then 'right afterwards'
-  switch to the corresponding interface.
-  If we dont wait long enough then we dont find the index of the process, but if we wait to long, then we don't hear all the text.
-  *** gather information, e.g. from latency in pactl list sinks, to configure this value
-      or find set somehow a fix output to the tool (currently not possible as it is executed with a new index every time)
-      If necessary add a new configuration seting, e.g. tts_start_delay
-- TTS:
-  check how to make this work in Termux
 - STT: 
   implement it or document how to configure
-- offline AI prompt:
-- update screenshots and videos
+- TTS:
+  loop used to replace sleep ${WAIT_START_TTS_SEC} in tts.sh is not working, find out why
+  the current hard-coded values may not work properly in every system
 - GUI (option -g):
-  - add sub-menus, e.g. showing selection options from available interfaces in order to set interface_index_tts_out
+  - add sub-menus, e.g. showing selection options from available interfaces in order to select them for communication, TTS, STT
   - add support to restore cfg to default values
-- fix audio input/output interfaces as configured
-  - no default anymore for communication
-  - TTS and STT audio interfaces could be set once for the App at system level (e.g. using .audiorc) instead of setting them with each call
-- test long-range with walkie-talkies (up to 6 Km in theory!)
-- sniffer: add new option and file mmrxsniff.sh
-           with no pwd: like mmrxnopwd.sh but removing the ACKs
-           can also easily reuse mmrx.sh to impl. sniffer?
-           otherwise, with mmrx.py
-- new option to use tmux split-window -v i.o. konsole -e -> just config?
-- check at startup if the configured terminal is available and use system default instead or install with sudo apt install as required
-- specify/configure audio interfaces:
-  - for the use case with 2 offline-devices:
-    the Receiver offline-device could as well receive over a 2nd audio interface the data being sent and then decrypt it to show the complete conversation on the same screen:
-                        ----->  receiver     <--
-          internet-PC                           | 2nd. audio interface 
-                        <-----  transmitter  -->
+- fix audio input/output interfaces as configured:
+  - system default for communication only if not configured, otherwise minimodem fix:
+    *** DONE (see # SET_COMM_IFS), but then rolled-back:
+              in the tested solution minimodem is running in a background tmux session (or a screen session) with a pipe to cat | minimodem
+              (in that case the sink-source remains always the same, i.e. interface_index_minimodem_in/out are set once and are working as expected)
+              but in that case the communication gets very unstable due to synchronization issues in minimodem, and probably also due to buffering in pipe, cat or tmux/screen
+              alternatives using a named pipe instead of cat, or a temporary variable or file did not work as minimodem gets called several times
+              A "dynamic" solution which detects the current sink-source used by minimodem which each call was not implemented
+              because it may bring timing-problems as is the case when setting the TTS sink based on the sink-input
+              A generic solution using virtual sinks and load-module in pulse audio may also not work when the sink-input changes with each call to minimodem.
+  - TTS audio interfaces could also be set once for the App at system level instead of setting them with each call
+    (see example solution for espeak in set_espeak_output.sh which does not work for festival.
+     Decide wether to use it and lose support for festival - and probably other TTS tools.
+     A generic solution using virtual sinks and load-module works fine but it's too complex and brings problems when reloading modules.
+     Nevertheless, this seems to be the correct solution to set audio interfaces once.)
 - extend session initialization to support AUTONEGOTIATION, that is, agreement on:
   - protocol version
   - BAUD
@@ -47,10 +32,21 @@
   - etc.
   Use default 300 or 1200 baud for initialzation, then switch to negotiated transfer rate.
   *** ADJUST VOLUMES on both sides AUTOMATICALLY during session initialization also !!! ***
-  *****************************************************************************************
 - GUI like AC4QGP:
   "merge" AC4QGP and tea2adt or just "pipe" adapted AC4QGP to tea2adt
   (we may need to use AT commands or something like that)
+- test long-range with walkie-talkies (up to 6 Km in theory!)
+- sniffer: add new option and file mmrxsniff.sh
+           with no pwd: like mmrxnopwd.sh but removing the ACKs
+           can also easily reuse mmrx.sh to impl. sniffer?
+           otherwise, with mmrx.py
+- new option to use tmux split-window -v i.o. konsole -e -> just config?
+- check at startup if the configured terminal is available and use system default instead or install with sudo apt install as required
+- use case with 2 offline-devices, test interface configuration:
+    the Receiver offline-device could as well receive over a 2nd audio interface the data being sent and then decrypt it to show the complete conversation on the same screen:
+                        ----->  receiver     <--
+          internet-PC                           | 2nd. audio interface 
+                        <-----  transmitter  -->
 - PEP8 for python code
 - improvement:
   configurable option: prevent user input during transmission (indicated by missing prompt cursor)? -> adapt mmtx.sh
