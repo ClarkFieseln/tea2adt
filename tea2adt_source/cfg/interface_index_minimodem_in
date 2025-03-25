@@ -1,0 +1,10 @@
+
+# WARNING: do not use this setting, leave the first line empty!
+#          the communication over minimodem will be done using the current system settings
+
+#################
+# 6  internal mic
+# 27 USB-mic
+# use 'tea2adt -a' to find out which interfaces are available in your system and show the current configuration
+# remember to also configure interface_index_minimodem_out
+#################
