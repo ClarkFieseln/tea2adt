@@ -1,3 +1,5 @@
-4
+
+# 4
+# warning: headaset and internal speaker may share the same index
 # use 'tea2adt -a' to find out which interfaces are available and show the current configuration
 # remember to also configure text_to_speech and volume_tts_out
