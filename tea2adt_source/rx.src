@@ -1,2 +1,1 @@
 minimodem --rx --ascii --quiet --startbits 1 --stopbits 1.0 --confidence ${CONFIDENCE} --limit ${LIMIT} --sync-byte ${SYNCBYTE} ${BAUD}
-
