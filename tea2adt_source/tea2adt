@@ -51,9 +51,22 @@ TEXT_TO_SPEECH=$(head -n 1 ${HOME}${TMP_PATH}/cfg/text_to_speech)
 SPEECH_TO_TEXT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/speech_to_text)
 INTERFACE_INDEX_TTS_OUT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/interface_index_tts_out)
 INTERFACE_INDEX_STT_IN=$(head -n 1 ${HOME}${TMP_PATH}/cfg/interface_index_stt_in)
+INTERFACE_INDEX_MINIMODEM_OUT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/interface_index_minimodem_out)
+INTERFACE_INDEX_MINIMODEM_IN=$(head -n 1 ${HOME}${TMP_PATH}/cfg/interface_index_minimodem_in)
 VOLUME_STT_IN=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_stt_in)
 VOLUME_TTS_OUT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_tts_out)
 LLM_CMD=$(head -n 1 ${HOME}${TMP_PATH}/cfg/llm_cmd)
+
+# SET_COMM_IFS
+# WORKAROUND: for now, clear audio interfaces for communication in case they were set altough not yet supported
+if [ "${INTERFACE_INDEX_MINIMODEM_IN}" != "" ] ; then
+    printf "INTERFACE_INDEX_MINIMODEM_IN is not supported yet. The default audio interfaces will be used instead."
+    INTERFACE_INDEX_MINIMODEM_IN=
+fi
+if [ "${INTERFACE_INDEX_MINIMODEM_OUT}" != "" ] ; then
+    printf "INTERFACE_INDEX_MINIMODEM_OUT is not supported yet. The default audio interfaces will be used instead."
+    INTERFACE_INDEX_MINIMODEM_OUT=
+fi
 
 trap ctrl_c INT
 
@@ -63,35 +76,89 @@ function ctrl_c()
     # kill $(ps -s $$ -o pid=)
     # pkill -P $$
     # restore mic volume
-    ${TERMINAL} ./restore_mic.sh &
+    ${TERMINAL} ./restore_audio_settings.sh &
+    # TODO: brute-force kill?
+    ./killtea2adt.sh 2> /dev/null &
     # and now ctr-c
     trap - INT
     kill -INT $$
 }
 
+# SET_COMM_IFS
+set_interfaces()
+{
+    # speaker / sink (communication)
+    if [ "${INTERFACE_INDEX_MINIMODEM_OUT}" != "" ] ; then
+        # get sink-input
+        while true; do
+            SINK_INPUT=$(pacmd list-sink-inputs | awk '/index:/{idx=$2} /application.process.binary = "minimodem"/{print idx; exit}')
+            if [ -n "$SINK_INPUT" ]; then
+                break
+            fi
+            sleep 1
+        done
+        # set configured sink for this specific sink-input
+        pactl move-sink-input ${SINK_INPUT} ${INTERFACE_INDEX_MINIMODEM_OUT}
+        echo "set minimodem output with sink input ${SINK_INPUT} to interface index ${INTERFACE_INDEX_MINIMODEM_OUT}"
+    fi
+    # microphone / source (communication)
+    if [ "${INTERFACE_INDEX_MINIMODEM_IN}" != "" ] ; then
+        # get source-input
+        while true; do
+            SOURCE_OUTPUT=$(pacmd list-source-outputs | awk '/index:/{idx=$2} /application.process.binary = "minimodem"/{print idx; exit}')
+            if [ -n "$SOURCE_OUTPUT" ]; then
+                break
+            fi
+            sleep 1
+        done
+        # set configured source for this specific source-output
+        pactl move-source-output ${SOURCE_OUTPUT} ${INTERFACE_INDEX_MINIMODEM_IN}
+        echo "set minimodem input with source output ${SOURCE_OUTPUT} to interface index ${INTERFACE_INDEX_MINIMODEM_IN}"
+    fi
+}
+
 set_volumes()
 {
-    if [ "${VOLUME_SPEAKER_LEFT}" != "" ] ; then
-        default_sink_index=$(pacmd list-sinks | grep "* index: " | grep -o '...$')
-        if [ "${default_sink_index:0:1}" == ":" ] ; then
-             default_sink_index=$(pacmd list-sinks | grep "* index: " | grep -o '..$')
+    # speaker
+    if [ "${INTERFACE_INDEX_MINIMODEM_OUT}" != "" ] ; then
+        if [ "${VOLUME_SPEAKER_LEFT}" != "" ] ; then
+            pactl -- set-sink-volume ${INTERFACE_INDEX_MINIMODEM_OUT} ${VOLUME_SPEAKER_LEFT} ${VOLUME_SPEAKER_RIGHT}
+            echo "setting output/speaker volume to L,R = ${VOLUME_SPEAKER_LEFT},${VOLUME_SPEAKER_RIGHT}"
         fi
-        pactl -- set-sink-volume ${default_sink_index} ${VOLUME_SPEAKER_LEFT} ${VOLUME_SPEAKER_RIGHT}
-        echo "setting default output/speaker volume to L,R = "${VOLUME_SPEAKER_LEFT}","${VOLUME_SPEAKER_RIGHT}
-        # echo "(leave cfg/volume_speaker_left empty in order to not set input volume automtatically)"
+        echo "configured output/speaker, index = " ${INTERFACE_INDEX_MINIMODEM_OUT}
+    else
+        if [ "${VOLUME_SPEAKER_LEFT}" != "" ] ; then
+            default_sink_index=$(pacmd list-sinks | grep "* index: " | grep -o '...$')
+            if [ "${default_sink_index:0:1}" == ":" ] ; then
+                 default_sink_index=$(pacmd list-sinks | grep "* index: " | grep -o '..$')
+            fi
+            pactl -- set-sink-volume ${default_sink_index} ${VOLUME_SPEAKER_LEFT} ${VOLUME_SPEAKER_RIGHT}
+            echo "setting default output/speaker volume to L,R = "${VOLUME_SPEAKER_LEFT}","${VOLUME_SPEAKER_RIGHT}
+            # echo "(leave cfg/volume_speaker_left empty in order to not set input volume automtatically)"
+        fi
+        # echo default settings for communication
+        echo "default output/speaker, index = " ${default_sink_index}
     fi
-    if [ "${VOLUME_MICROPHONE}" != "" ] ; then
-        default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '...$')
-        if [ "${default_source_index:0:1}" == ":" ] ; then
-             default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '..$')
-        fi    
-        pactl -- set-source-volume ${default_source_index} ${VOLUME_MICROPHONE}
-        echo "setting default input/microphone volume to "${VOLUME_MICROPHONE}
-        # echo "(leave cfg/volume_microphone empty in order to not set output volume automtatically)"
+    # mic
+    if [ "${INTERFACE_INDEX_MINIMODEM_IN}" != "" ] ; then
+        if [ "${VOLUME_MICROPHONE}" != "" ] ; then   
+            pactl -- set-source-volume ${INTERFACE_INDEX_MINIMODEM_IN} ${VOLUME_MICROPHONE}
+            echo "setting input/microphone volume to "${VOLUME_MICROPHONE}
+            # echo "(leave cfg/volume_microphone empty in order to not set output volume automtatically)"
+        fi
+        echo "configured input/microphone, index = " ${INTERFACE_INDEX_MINIMODEM_IN}
+    else
+        if [ "${VOLUME_MICROPHONE}" != "" ] ; then
+            default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '...$')
+            if [ "${default_source_index:0:1}" == ":" ] ; then
+                 default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '..$')
+            fi    
+            pactl -- set-source-volume ${default_source_index} ${VOLUME_MICROPHONE}
+            echo "setting input/microphone volume to "${VOLUME_MICROPHONE}
+            # echo "(leave cfg/volume_microphone empty in order to not set output volume automtatically)"
+        fi
+        echo "default input/microphone, index = " ${default_source_index}
     fi
-    # echo default settings for communication
-    echo "default output/speaker, index = " ${default_sink_index}
-    echo "default input/microphone, index = " ${default_source_index}
     # TTS
     if [ "${TEXT_TO_SPEECH}" != "" ] ; then
         if [ "${VOLUME_TTS_OUT}" != "" ] ; then
@@ -171,6 +238,9 @@ ask_password()
     done
 }
 
+# SET_COMM_IFS
+# TODO: if we get feature # SET_COMM_IFS to work, then we need to update this function to show the correct comm. interfaces
+#       which will then be defined by INTERFACE_INDEX_MINIMODEM_IN and INTERFACE_INDEX_MINIMODEM_OUT
 echo_audio_interfaces()
 {
     # list audio output interfaces
@@ -282,6 +352,28 @@ This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law."
 }
 
+: '
+# SET_COMM_IFS
+---------------------------------------------
+NOTE: set audio interfaces for communication:
+---------------------------------------------
+    in the tested solution minimodem is running in a background tmux session (or a screen session) with a pipe to cat | minimodem
+    (in that case the sink-source remains always the same, i.e. interface_index_minimodem_in/out are set once and are working as expected)
+    but in that case the communication gets very unstable due to synchronization issues in minimodem, and probably also due to buffering in pipe, cat or tmux/screen
+    alternatives using a named pipe instead of cat, or a temporary variable or file did not work as minimodem gets called several times
+    A "dynamic" solution which detects the current sink-source used by minimodem which each call was not implemented
+    because it may bring timing-problems as is the case when setting the TTS sink based on the sink-input
+    A generic solution using virtual sinks and load-module in pulse audio may also not work when the sink-input changes with each call to minimodem.
+init_minimodem()
+{
+    # init minimodem process in new tmux session which can then be written with tmux send-keys -t session_mmtx
+    tmux new-session -d -s session_mmtx "cat | minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 --sync-byte ${SYNCBYTE} --volume 1.0 ${BAUD}" &
+    # alternative:
+    # screen -dmS session_mmtx bash -c "cat | minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 --sync-byte 0x7F --volume 1.0 9600" &
+}
+'
+
+# options
 if [ "$1" == "" ] ; then
     echo "tea2adt: *** you must specify an option, run tea2adt -h for more information ***"
     echo_help
@@ -289,25 +381,32 @@ elif [ "$1" == "-a" ] || [ "$1" == "--audio-settings" ] ; then
     echo_audio_interfaces
 elif [ "$1" == "-c" ] || [ "$1" == "--chat" ] ; then
     ask_password
+    # init_minimodem
+    set_volumes
+    create_fifos "$1"
     ${TERMINAL} ./mmtx.sh "${PASSWORD}" &
     # wait a little bit so the transmitter can initialize the state flags
-    sleep 0.5    
-    set_volumes
+    sleep 0.5
     echo_parameters
+    # don't call set_interfaces here,  have not yet a source-output, need yet to run rx.src
     source rx.src | python3 mmrx.py "${PASSWORD}" $1
 elif [ "$1" == "-f" ] || [ "$1" == "--file" ] ; then
     ask_password
+    # init_minimodem
+    set_volumes
     create_fifos "$1"
     ${TERMINAL} ./mmtxfile.sh "${PASSWORD}" &
     # wait a little bit so the transmitter can initialize the state flags
     sleep 0.5
     # track input files
     ${TERMINAL} cat ${PIPE_FILE_IN} &
-    set_volumes
+    # don't call set_interfaces here,  have not yet a source-output, need yet to run rx.src
     # we don't echo_parameters in -f mode
     source rx.src | python3 mmrx.py "${PASSWORD}" $1
 elif [ "$1" == "-l" ] || [ "$1" == "--llm" ] || [ "$1" == "--llm-chat" ] || [ "$1" == "--llm-prompt" ] ; then
     ask_password
+    # init_minimodem
+    set_volumes
     create_fifos "$1"
     if [ "${LLM_CMD}" != "" ] ; then
         # check if ollama is used and if it is running
@@ -328,28 +427,33 @@ elif [ "$1" == "-l" ] || [ "$1" == "--llm" ] || [ "$1" == "--llm-chat" ] || [ "$
         echo "Error: llm_cmd is not configured!"
         exit
     fi
-    set_volumes
     echo_parameters
+    # don't call set_interfaces here,  have not yet a source-output, need yet to run rx.src
     source rx.src | python3 mmrx.py "${PASSWORD}" $1
 elif [ "$1" == "-s" ] || [ "$1" == "--rs" ] || [ "$1" == "--remote-shell" ] || [ "$1" == "--reverse-shell" ] ; then
     ask_password
+    # init_minimodem
+    set_volumes
     create_fifos "$1"
     # create persistent shell to run in background with input and output pipes
     while true; do /bin/sh &> ${PIPE_SHELL_OUT}; done 0< ${PIPE_SHELL_IN} &
-    set_volumes
     echo_parameters
+    # don't call set_interfaces here,  have not yet a source-output, need yet to run rx.src
     source rx.src | python3 mmrx.py "${PASSWORD}" $1
 elif [ "$1" == "-p" ] || [ "$1" == "--probe" ] ; then
+    # init_minimodem
     set_volumes
     echo_parameters
     ${TERMINAL} ./mmrxnopwd.sh &
     echo "**********************************"
-    echo "*** tea2adt probe transmitter ***"
+    echo "*** tea2adt probe transmitter ****"
     echo "**********************************"
     echo "Test messages "${PROBE_MSG}" sent with a delay of "${PROBE_SLEEP}" seconds..."
     echo "(a separate terminal is opened to receive unencrypted test messages from the communication partner)"
+    # SET_COMM_IFS
+    # set_interfaces
     while :
-    do     
+    do
         echo ${PROBE_MSG} | source tx.src
         sleep ${PROBE_SLEEP}
     done
