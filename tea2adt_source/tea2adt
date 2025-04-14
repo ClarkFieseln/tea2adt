@@ -454,7 +454,7 @@ elif [ "$1" == "-p" ] || [ "$1" == "--probe" ] ; then
     # set_interfaces
     while :
     do
-        echo ${PROBE_MSG} | source tx.src
+        echo "${PROBE_MSG}" | source tx.src
         sleep ${PROBE_SLEEP}
     done
 elif [ "$1" == "-g" ] || [ "$1" == "--gui" ] ; then
