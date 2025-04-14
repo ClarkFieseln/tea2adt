@@ -1,3 +1,11 @@
+- SIP and cellphone tests:
+    - chat, shell:   termux (HUAWEI) - fix SIP (Acer) to fix SIP (Samsung)             - PC (Packard-Bell)
+    - chat, shell:   termux (HUAWEI) - fix SIP (Acer) to cellphone (Samsung, WLAN off) - PC (Packard-Bell)
+- start a presistent ollama session? e.g. to continue chat after some days
+  support from ollama v0.6.3 onwards?
+  here an example:
+  session_id=$(ollama run $model --session)
+  response=$(ollama run $model --session "$session_id" "$input")
 - processing of characters ",*,etc.:
   - in chat with LLM (if " is not closed then we have a problem!)
   - in TTS output (?)
