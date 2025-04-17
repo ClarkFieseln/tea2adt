@@ -49,7 +49,7 @@ See also <https://www.codeproject.com/Articles/5295970/Audio-Chat-for-Quite-Good
 ```
 enter and confirm password
 
-On the other device a chat or a remote shell can be started.
+On the other device a chat, a remote shell or a remote AI prompt can be started.
 
 ### Remote Shell
 
