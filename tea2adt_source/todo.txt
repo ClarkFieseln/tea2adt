@@ -1,3 +1,25 @@
+- shell: interactive sessions, e.g. with calc or python, during remote shell are possible
+         but this is not the case e.g. when calling python -> implement (move session to sub-shell?)   
+    solution using expect (need sudo apt install expect):
+    expect -c 'spawn python; expect ">>>"; interact'
+    (exit with quit())
+    expect -c 'spawn calc; expect ";"; interact'
+    (exit with exit)
+    # NOTE: expect is between user interaction so there may be formatting problems.
+    # NOTE: you may also put the script in a file and run it with: 
+    chmod +x myscript.exp
+    ./myscript.exp
+    or
+    expect myscript.exp
+    Investigate options using Tcl, Tk and wish.
+- shell: the command clear is executed only after a new command is executed. Solution?
+- shell: starting programs, e.g. gedit, works but then what? we cannot interact with the app.
+         check also some tcl script using wish, e.g.:
+         #!/usr/bin/env wish
+         package require Tk
+         label .msg -text "Hello from wish"
+         pack .msg
+         (shows a small window with that text!)
 - SIP and cellphone tests:
     - chat, shell:   termux (HUAWEI) - fix SIP (Acer) to fix SIP (Samsung)             - PC (Packard-Bell)
     - chat, shell:   termux (HUAWEI) - fix SIP (Acer) to cellphone (Samsung, WLAN off) - PC (Packard-Bell)
@@ -105,10 +127,6 @@
 - improvement: performance:
   implement everything in C or C++ to gain speed, readability, etc.
   (relatively small performance gain, e.g. of 15ms, as the biggest delays are introduced by gpg and minimodem)
-- shell: interactive sessions, e.g. with calc, during remote shell are possible
-         but this is not the case e.g. when calling python -> implement (move session to sub-shell?)
-- shell: the command clear is executed only after a new command is executed. Solution?
-- shell: starting programs, e.g. gedit, works but then what? we cannot interact with the app.
 - plausibility checks on configuration parameters
 - similar to TFC-Installation: protection measures (see here: https://github.com/maqp/tfc/wiki/Threat-model)
 TLS-MITM attack during installation
