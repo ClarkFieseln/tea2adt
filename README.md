@@ -71,7 +71,7 @@ then enter and confirm password
 
 On the other device a chat shall be started to interact with the remote AI prompt.
 
-With this option you may remotely access your local, secure, and self-hosted AI (like ollama) in a secure way!
+With this option you may remotely access your local, secure, and self-hosted AI model (like ollama) or AI agent (like OpenClaw) in a secure way!
 
 ### File Transfer
 
@@ -240,7 +240,7 @@ Text-to-speech demo video: https://www.youtube.com/watch?v=-ikTdBzhCSw&list=PLX2
 <!-- # ![plot](./screenshots/20250318_161119.jpg) -->
 [![Text-to-speech](https://raw.githubusercontent.com/ClarkFieseln/tea2adt/refs/heads/main/screenshots/20250318_161119.jpg)](https://www.youtube.com/watch?v=6jYEBNAay64&list=PLX24fhcibpHXllvUgFUw6Ly9cwQcTcKac&index=1&pp=gAQBiAQB)
 
-With this option you may remotely access your local, secure, and self-hosted AI (like ollama) in a secure way!
+With this option you may remotely access your local, secure, and self-hosted AI (like ollama) or AI agent (like OpenClaw) in a secure way!
 
 Remote AI prompt, demo video: https://www.youtube.com/watch?v=6jYEBNAay64&list=PLX24fhcibpHXllvUgFUw6Ly9cwQcTcKac&index=1&pp=gAQBiAQB
 
