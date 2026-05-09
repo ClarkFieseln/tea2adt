@@ -6,7 +6,7 @@
 # Reference implementation for TTS with espeak (not working with festival!):
 # --------------------------------------------------------------------------
 # create tmux session for espeak
-# important: espeak will from now on always have the same sink-input which can be redirected once!
+# important: espeak will always have the same sink-input which can be redirected once!
 #            (this is not the case if we use festival)
 tmux new-session -d -s session_tts "cat | espeak"
 # need to output tts once in order to get the sink-input
@@ -22,10 +22,10 @@ while true; do
     fi
     sleep 1
 done
-echo "SINK_INPUT = ${SINK_INPUT}"
+printf '%s\n' "SINK_INPUT = ${SINK_INPUT}"
 # set configured sink for this specific sink-input
-# pactl move-sink-input ${SINK_INPUT} ${INTERFACE_INDEX_TTS_OUT}
-pactl move-sink-input ${SINK_INPUT} 16 # 16) 4)
+pactl move-sink-input ${SINK_INPUT} ${INTERFACE_INDEX_TTS_OUT}
+# pactl move-sink-input ${SINK_INPUT} 16 # 16) 4)
 # give time to switch
 sleep 1
 # test new setting, that is, output to new audio interface
