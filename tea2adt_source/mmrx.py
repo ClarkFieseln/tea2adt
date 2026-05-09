@@ -16,6 +16,7 @@ import random
 import getopt
 import re
 import string
+import shlex
 
 
 
@@ -87,7 +88,7 @@ def main():
     WRITE_FILE_OUT_64 = 1
     WRITE_AND_DECODE_FILE_OUT_64 = 2
     APPEND_FILE_OUT_64 = 3
-    DECODE_FILE_OUT_64 = 4
+    # DECODE_FILE_OUT_64 = 4
     APPEND_AND_DECODE_FILE_OUT_64 = 5
     state_file_out = INCOMPLETE_FILE_OUT_64
     
@@ -140,13 +141,13 @@ def main():
     TTS_OUT_FILE = HOME+TMP_PATH+"/state/tts_out"
         
     # parse arguments
-    #################                    
+    #################
     if len(sys.argv) > 1:
         if sys.argv[1] != "":
             PASSWORD = sys.argv[1]
 
     # current configuration
-    #######################  
+    #######################
     # half_duplex
     f = open(HOME+TMP_PATH+"/cfg/half_duplex", "r")
     if f.read().splitlines()[0] == "true":
@@ -363,6 +364,7 @@ def main():
     print("Waiting for session to be established...")
             
     # SET_COMM_IFS
+    # the tag SET_COMM_IFS marks reference implementation for future use
     '''
     # initialize audio interfaces
     #############################
@@ -371,10 +373,7 @@ def main():
     command = "./set_interfaces.sh"
     p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
     out, err = p1.communicate()                                        
-    if p1.returncode == 0:
-        p1.terminate()
-        p1.kill()
-    else:
+    if p1.returncode != 0:
         logging.warning("Could not initialize audio intefaces!")  
     logging.debug("Audio interfaces set as configured.") 
     '''
@@ -470,17 +469,16 @@ def main():
                 while SPEAKING:
                     sleep(TIMEOUT_POLL_SEC)                    
             # WORKAROUND: works with ; but not with "*<   ...why?
-            prompt_input = prompt_input.replace(';', '\\;')  # 
-            # write input to LLM via tmux in order to maintain the session
-            command = "".join(["tmux send-keys -t session_llm \"", prompt_input, "\" Enter"])
+            prompt_input = prompt_input.replace(';', '\\;')  #
+
+            # Send input to tgpt via tmux send-keys
+            # NOK for tgpt: command = f'tmux send-keys -t session_llm "{prompt_input}" Enter'
+            # instead we need to do interpret prompt as literal
+            command = f'tmux send-keys -t session_llm -l "{prompt_input}" && tmux send-keys -t session_llm Enter'
             p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
             out, err = p1.communicate()                                        
-            if p1.returncode == 0:
-                p1.terminate()
-                p1.kill()
-            else:
-                logging.warning("could not send input to LLM!")  
-            logging.debug("Input for LLM sent to model.")           
+            if p1.returncode != 0:
+                logging.debug("Input for LLM sent to model.")
 
     # thread to transmit minimodem message
     # (without encryption and seq. nr.)
@@ -503,33 +501,29 @@ def main():
                 command = "./mute_mic.sh"
                 p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)        
                 out, err = p1.communicate()                                        
-                if p1.returncode == 0:
-                    p1.terminate()
-                    p1.kill()
+
             # minimodem --tx
-            command = "".join(["echo \"", message, "\" | minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 --sync-byte ", SYNC_BYTE, " --volume 1.0 ", BAUD])
-            # SET_COMM_IFS
-            # command = "".join(["tmux send-keys -t session_mmtx \"", message, "\" Enter"])
-            # alternative:
-            # command = "".join(["screen -S session_mmtx -X stuff \"", message, "^M\" Enter"])
+            command = (
+                f'printf \'%s\\n\' "{message}" | '
+                f'minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 '
+                f'--sync-byte {SYNC_BYTE} -R 48000 --volume 1.0 {BAUD} '
+                f'--file {HOME}{TMP_PATH}/state/minimodem_mmrx_out.wav && '
+                f'play --buffer 65536 {HOME}{TMP_PATH}/state/minimodem_mmrx_out.wav -q'
+            )
             if VERBOSE:
                 # stdout to see VERBOSE text from minimodem
                 p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
             else:
-                p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)        
+                p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
             out, err = p1.communicate()                                        
             if p1.returncode == 0:
-                p1.terminate()
-                p1.kill()
                 logging.info("> " + message)
+            
             # unmute mic?
             if HALF_DUPLEX:         
                 command = "./unmute_mic.sh"
                 p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)        
-                out, err = p1.communicate()                                        
-                if p1.returncode == 0:
-                    p1.terminate()
-                    p1.kill()
+                out, err = p1.communicate()
             TX_SENDING = False                        
                 
     if REMOTE_SHELL or FILE_TRANSFER or LLM:
@@ -559,7 +553,7 @@ def main():
                 TX_SENDING = True
                 # add single quotes around the password in case it contains spaces   
                 # note: we may instead send something in data with ./mmdata.sh, i.o. just [ack], in order to flush the shell command output
-                command = "".join(["./mmack.sh '", PASSWORD, "'"])
+                command = f"./mmack.sh '{PASSWORD}'"
                 if VERBOSE:
                     # stdout to see VERBOSE text from mmack.sh                        
                     p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
@@ -567,8 +561,6 @@ def main():
                     p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
                 out, err = p1.communicate()
                 if p1.returncode == 0:
-                    p1.terminate()
-                    p1.kill()
                     logging.info("> [ack]")
                 TX_SENDING = False
                 
@@ -583,16 +575,13 @@ def main():
             # TTS out
             # add quotes around the data in case it contains spaces
             # TODO: catch if odd number of " characters in text and do something (remove/replace or supress error output)
-            command = "".join(["./tts.sh \"", text, "\""])
+            command = f'./tts.sh "{text}"'
             if VERBOSE:
                 # stdout to see VERBOSE text from tts.sh                        
                 p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
             else:
                 p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
             out, err = p1.communicate()
-            if p1.returncode == 0:
-                p1.terminate()
-                p1.kill()
             # make a pause after we speak
             # pause is proportial to the estimated time needed to speak to the end
             # TODO: adapt if required e.g. when calling espeak -s 110 which is slower than default 150 and thus takes longer
@@ -607,7 +596,7 @@ def main():
             ##################
             while run_thread:
                 # block until something is input to the queue
-                #text = ttsQueue.get(block=True)
+                # text = ttsQueue.get(block=True)
                 while ttsQueue.empty():
                     sleep(TIMEOUT_POLL_SEC)
                 # check flag
@@ -624,8 +613,27 @@ def main():
                 # clear flag
                 SPEAKING = False
       
-    if LLM:                
-        # thread to gather and transmit output from LLM    
+    if LLM:
+        # definitions and helper function to manage escape characters and emojis
+        ########################################################################
+        ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+        TGPT_MARKERS = {"╭─ You", "╰─>", "╭─ Bot", "Interactive mode"}
+        EMOJI_PATTERN = re.compile("["
+                                   u"\U0001F600-\U0001F64F"
+                                   u"\U0001F300-\U0001F5FF"
+                                   u"\U0001F680-\U0001F9FF"
+                                   u"\U00002702-\U000027B0"
+                                   "]+", flags=re.UNICODE)
+
+        def is_llm_response(line):
+            clean = ANSI_ESCAPE.sub('', line).strip()
+            if not clean:
+                return False
+            if any(marker in clean for marker in TGPT_MARKERS):
+                return False
+            return True
+
+        # thread to gather and transmit output from LLM
         ###############################################
         def LLMTransmitThread():
             global TX_SENDING
@@ -651,7 +659,7 @@ def main():
                         llm_output_part = llmOutputQueue.get(block=True, timeout=LLM_OUTPUT_READ_TIMEOUT_SEC)
                         # append data
                         if llm_output_part != None:
-                            llm_output = "".join([llm_output, llm_output_part])
+                            llm_output = f"{llm_output}{llm_output_part}"
                             read_lines = read_lines + 1                    
                         # timeout?
                         end_time = datetime.datetime.now()
@@ -665,36 +673,17 @@ def main():
                     # reset flag
                     if NEED_ACK:
                         WAITING_FOR_LLM_OUTPUT = False
-                    # escape special characters: !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
-                    # TODO: check why we get /bin/sh: 2: Syntax error: Unterminated quoted string when we use this code
-                    # create a translation table
-                    ## translation_table = str.maketrans({char: f'\\\\{char}' for char in string.punctuation})
-                    # apply the translation to the input string
-                    ## llm_output = llm_output.translate(translation_table)
-                    # use utf-8 in LLMOutputThread() instead?
-                    # for now replace problematic characters explicitely
+
+                    # replace problematic characters
                     llm_output_printable = llm_output
                     llm_output = llm_output.replace("\n", "\r")
-                    llm_output = llm_output.replace("(", "\\(")
-                    llm_output = llm_output.replace(")", "\\)")
-                    llm_output = llm_output.replace("�", "\\�")                    
-                    llm_output = llm_output.replace("'", "\\'")
-                    # llm_output = llm_output.replace('"', '\\"')  # ?
-                    llm_output = llm_output.replace('|', '\\|')
-                    llm_output = llm_output.replace('#', '\\#')
-                    llm_output = llm_output.replace('&', '\\&')
-                    # llm_output = llm_output.replace('*', '\\*')  # ?
-                    llm_output = llm_output.replace(';', '\\;')  # ?
-                    llm_output = llm_output.replace('<', '\\<')  # ?
-                    llm_output = llm_output.replace('>', '\\>')
-                    # llm_output = llm_output.replace('\', '\\\')  # ?
-                    # avoid collissions
+
+                    # avoid collisions
                     while TX_SENDING:
                         sleep(TIMEOUT_POLL_SEC)
                     # send data
                     TX_SENDING = True
-                    # add quotes around the password in case it contains spaces        
-                    command = "".join(["./mmsessionout.sh \"", PASSWORD, "\" ", llm_output])
+                    command = f'./mmsessionout.sh "{PASSWORD}" {shlex.quote(llm_output)}'
                     if VERBOSE:
                         # stdout to see VERBOSE text from mmsessionout.sh
                         p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
@@ -702,19 +691,17 @@ def main():
                         p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
                     out, err = p1.communicate()                
                     if p1.returncode == 0:
-                        p1.terminate()
-                        p1.kill()
                         # show LLM output in prompt
                         ###########################
                         if SHOW_TX_PROMPT:
                             print("> " + llm_output_printable, end='')
-                        else:                                                                
-                            print(llm_output_printable, end='')                                          
+                        else:
+                            print(llm_output_printable, end='')
                     TX_SENDING = False
             
         # thread to get output from LLM
         ###############################
-        def LLMOutputThread():        
+        def LLMOutputThread():
             # llm output fifo
             #################
             # Open read end of pipe. Open this in non-blocking mode since otherwise it
@@ -725,21 +712,48 @@ def main():
             # TODO: check why this is not working,
             #       with grep -v we get only the responses from the LLM:
             #       cmd_to_read_pipe_llm_out = "".join(["cat ", PIPE_LLM_OUT, " | grep -v '>>>'"])
-            cmd_to_read_pipe_llm_out = "".join(["cat ", PIPE_LLM_OUT])
+            cmd_to_read_pipe_llm_out = f"cat {PIPE_LLM_OUT}"
             proc = subprocess.Popen(cmd_to_read_pipe_llm_out,
                                     shell=True,
                                     stdin=pipe_llm_out,
                                     stderr=subprocess.PIPE,  # stderr=subprocess.DEVNULL,
                                     stdout=subprocess.PIPE,
                                     text=True)
+
             # main loop
             ###########
+            # TODO: specific implementation for 'tgpt', adapt as required to support other tools
+            accumulator = ""
+            last_append_time = None
             while run_thread:
-                llm_output_part = proc.stdout.readline()
-                # TODO: check cmd_to_read_pipe_llm_out using grep above and then use this line
-                # if (llm_output_part != "") and (llm_output_part != "\n"):
-                if (llm_output_part != "") and (llm_output_part != "\n") and (">>>" not in llm_output_part):
-                    llmOutputQueue.put(llm_output_part)
+                # non-blocking readline with 0.5s timeout
+                ready = select.select([proc.stdout], [], [], 0.5)
+                if ready[0]:
+                    llm_output_part = proc.stdout.readline()
+                else:
+                    llm_output_part = ""
+                # put line in queue
+                if llm_output_part:
+                    clean_line = ANSI_ESCAPE.sub('', llm_output_part).strip()
+                    if "╭─ You" in llm_output_part:
+                        if accumulator.strip():
+                            clean_accumulator = EMOJI_PATTERN.sub('', accumulator.strip())
+                            llmOutputQueue.put(clean_accumulator + "\n")
+                            accumulator = ""
+                            last_append_time = None
+                    elif is_llm_response(llm_output_part):
+                        if clean_line:
+                            accumulator += clean_line + " "
+                            last_append_time = datetime.datetime.now()
+                # flush if no new data for 5 seconds
+                if last_append_time and accumulator.strip():
+                    delta = (datetime.datetime.now() - last_append_time).total_seconds()
+                    if delta > 5.0:
+                        clean_accumulator = EMOJI_PATTERN.sub('', accumulator.strip())
+                        llmOutputQueue.put(clean_accumulator + "\n")
+                        accumulator = ""
+                        last_append_time = None
+
             # clean up
             ##########
             proc.terminate()
@@ -747,8 +761,8 @@ def main():
             # Close read end of pipe since it is not used in the parent process.
             os.close(pipe_llm_out)
             os.unlink(PIPE_LLM_OUT)
-            
-    elif REMOTE_SHELL:                
+
+    elif REMOTE_SHELL:
         # thread to gather and transmit output from shell    
         #################################################
         def ShellTransmitThread():
@@ -775,7 +789,7 @@ def main():
                         shell_output_part = shellOutputQueue.get(block=True, timeout=SHELL_OUTPUT_READ_TIMEOUT_SEC)
                         # append data
                         if shell_output_part != None:
-                            shell_output = "".join([shell_output, shell_output_part])
+                            shell_output = f"{shell_output}{shell_output_part}"
                             read_lines = read_lines + 1                    
                         # timeout?
                         end_time = datetime.datetime.now()
@@ -792,20 +806,22 @@ def main():
                     # prepare data for transmission as a "block" (otherwise we would send each line separately)
                     shell_output_printable = shell_output
                     shell_output = shell_output.replace("\n", "\r")
-                    # TODO: find out why we get characters that are not allowed in file names
+                    # TODO: use shlex.quote(llm_output) as in LLM
+                    #       or
+                    #       find out why we get characters that are not allowed in file names
                     #       and extend this workaround to further characters like *, ?, >, <, :, |, ...
                     #       check e.g. https://stackoverflow.com/questions/4814040/allowed-characters-in-filename
                     shell_output = shell_output.replace("(", "\\(")
                     shell_output = shell_output.replace(")", "\\)")
                     shell_output = shell_output.replace("�", "\\�")
                     shell_output = shell_output.replace("'", "\\'")
-                    # avoid collissions
+                    # avoid collisions
                     while TX_SENDING:
                         sleep(TIMEOUT_POLL_SEC)
                     # send data
                     TX_SENDING = True
                     # add quotes around the password in case it contains spaces        
-                    command = "".join(["./mmsessionout.sh \"", PASSWORD, "\" ", shell_output])
+                    command = f'./mmsessionout.sh "{PASSWORD}" {shell_output}'
                     if VERBOSE:
                         # stdout to see VERBOSE text from mmsessionout.sh
                         p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
@@ -813,8 +829,6 @@ def main():
                         p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
                     out, err = p1.communicate()                
                     if p1.returncode == 0:
-                        p1.terminate()
-                        p1.kill()
                         # show shell output in prompt
                         #############################
                         if SHOW_TX_PROMPT:
@@ -835,7 +849,7 @@ def main():
             pipe_shell_out = os.open(PIPE_SHELL_OUT, os.O_RDONLY | os.O_NONBLOCK)
             # execute cat pipe_shell_out
             ############################
-            command = "".join(["cat ", PIPE_SHELL_OUT])
+            command = f"cat {PIPE_SHELL_OUT}"
             proc = subprocess.Popen(command,
                                     shell=True,
                                     stdin=pipe_shell_out,
@@ -917,7 +931,7 @@ def main():
     got_message = False
     data_buffer = ""
     start = -1
-    end = -1    
+    end = -1
     # first value to be received will be 1
     seq_tx_prev = 0
     # default value shall be different to 1 (to be received) and different to INVALID_SEQ_NR (default value)
@@ -926,7 +940,7 @@ def main():
     # main loop
     ###########
     while True:
-        try:            
+        try:
             # Read string data from stdin      
             # and send [keepalive] or [ack] when needed
             ###########################################
@@ -978,7 +992,7 @@ def main():
                                 minimodem_tx("[keepalive]")
                     else:
                         data = sys.stdin.readline()
-                except Exception as e:              
+                except Exception as e:
                     # exit app?
                     ###########
                     if run_thread == False:
@@ -993,7 +1007,7 @@ def main():
                     data = ""
                     # '''
                     stdin_err_cnt = stdin_err_cnt + 1
-                    logging.info("".join(["< binary data! count = ", str(stdin_err_cnt)]))
+                    logging.info(f"< binary data! count = {stdin_err_cnt}")
                     # if we receive too many consecutive bytes the program hangs!
                     # by introducing this small delay we seem to prevent that
                     sleep(0.01)
@@ -1010,7 +1024,7 @@ def main():
                             # we catch the exception otherwise
                             test_char = char.encode('ascii')
                             # add valid character to encoded buffer
-                            data_encoded = "".join([data_encoded, char])
+                            data_encoded = f"{data_encoded}{char}"
                         except UnicodeEncodeError as e:
                             # add replacement character to encoded data
                             # data_encoded = "".join([data_encoded, '?'])
@@ -1096,17 +1110,17 @@ def main():
                         end = data_encoded.find("-----END PGP MESSAGE-----")
                         if end >= 0:
                             # now we have the complete message                  
-                            data_buffer = "".join([data_buffer, data_encoded[:end+24]]) # remove data after end message
+                            data_buffer = f"{data_buffer}{data_encoded[:end+24]}" # remove data after end message
                             got_message = True               
                         # gather intermediate data
                         else:                            
-                            data_buffer = "".join([data_buffer, data_encoded])
+                            data_buffer = f"{data_buffer}{data_encoded}"
                             
                     # decrypt input message
                     #######################
-                    if got_message:                                            
+                    if got_message:
                         num_bytes_written = 0
-                        # store input data in a temporary file                                        
+                        # store input data in a temporary file
                         with open(TEMP_GPG_FILE, "w") as data_file:
                             try:                                
                                 num_bytes_written = data_file.write(data_buffer)
@@ -1122,12 +1136,27 @@ def main():
                             try:
                                 # call GPG to decrypt input data
                                 # add single quotes around the password in case it contains spaces
-                                command = "".join(["gpg --batch --passphrase '", PASSWORD, "' ", ARMOR, " -d ", TEMP_GPG_FILE, SENT_OUT_TO_DEV_NULL])
+                                # TODO: instead of subprocess.Popen()
+                                #       pass arguments as a list to subprocess.run()
+                                '''
+                                subprocess.run([
+                                    "gpg",
+                                    "--batch",
+                                    "--passphrase", PASSWORD,
+                                    ARMOR,
+                                    "-d",
+                                    TEMP_GPG_FILE
+                                ])
+                                '''
+                                # If PASSWORD contains:
+                                #   ' (single quote)
+                                #   $, ;, &
+                                #   spaces
+                                # it can break the command or cause injection issues.
+                                command = f"gpg --batch --passphrase '{PASSWORD}' {ARMOR} -d {TEMP_GPG_FILE} {SENT_OUT_TO_DEV_NULL}"
                                 p1 = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, text=True)
                                 out, err = p1.communicate()                                        
                                 if p1.returncode == 0:
-                                    p1.terminate()
-                                    p1.kill()                      
                                     seq_tx = ord(out[0])-33
                                     seq_tx_str = str(seq_tx)
                                     # seq_tx_acked is the field seq_rx in the message,
@@ -1178,7 +1207,7 @@ def main():
                                                     if VERBOSE:
                                                         print("< [" + f"{seq_tx:02d}" + "," + f"{seq_tx_acked:02d}" + "] " + decrypted_data, flush=True)
                                                     else:
-                                                        print("".join(["< ", decrypted_data]), flush=True)
+                                                        print(f"< {decrypted_data}", flush=True)
                                                 else:                                        
                                                     print(decrypted_data)
   
@@ -1195,7 +1224,7 @@ def main():
                                                     # TODO: this is ollama-specific
                                                     #       implement here something generic, for now we use this as a general special code to leave
                                                     # leave LLM?
-                                                    if decrypted_data == "/bye":
+                                                    if decrypted_data == "/bye" or decrypted_data == "/exit":
                                                         # generate Ctrl+C 
                                                         raise KeyboardInterrupt()
                                                     else:
@@ -1209,21 +1238,21 @@ def main():
                                                     if NEED_ACK:
                                                         WAITING_FOR_COMMAND_OUTPUT = True
                                                     # write input command to pipe_shell_in
-                                                    os.write(pipe_shell_in, bytes("".join([decrypted_data, '\n']), 'utf-8'))
+                                                    os.write(pipe_shell_in, f"{decrypted_data}\n".encode("utf-8"))
                                                     logging.debug("Shell output sent.")
                                                     
                                                 # text to speech?
                                                 #################
                                                 if TTS:
-                                                    # NOTE: if the communication parter is running a shell then our REMOTE_SHELL will still be False (deactivate TTS in cfg/text_to_speech if required)
+                                                    # NOTE: if the communication partner is running a shell then our REMOTE_SHELL will still be False (deactivate TTS in cfg/text_to_speech if required)
                                                     if not REMOTE_SHELL and not FILE_TRANSFER:
                                                         # NOTE: text with pauses as defined in pattern requires a separate call each time
                                                         decrypted_data_list = re.split(pattern, decrypted_data)
                                                         for index, sentence in enumerate(decrypted_data_list, 1):
                                                             tts(f"{sentence.strip()}")
-                                                            
+
                                             # empty data
-                                            else:                                        
+                                            else:
                                                 logging.info("< empty_data["+seq_tx_str+","+seq_tx_acked_str+"]")
                                         # repeated data
                                         else:
@@ -1268,7 +1297,7 @@ def main():
                                                     # incomplete file
                                                     state_file_out = INCOMPLETE_FILE_OUT_64                                            
                                             else:                            
-                                                # new file (beginn)
+                                                # new file (begin)
                                                 if file_name == "":
                                                     RX_RECEIVING_FILE = True
                                                     file_name = out[13:end]
@@ -1298,13 +1327,10 @@ def main():
                                                         f = open(TMPFILE_BASE64_IN, "a")
                                                     f.write(decrypted_file_data)
                                                     f.close()
-                                                    command = "".join(["base64 -d < '", TMPFILE_BASE64_IN, "' > 'rx_files/", file_name, "'"])
+                                                    command = f"base64 -d < '{TMPFILE_BASE64_IN}' > 'rx_files/{file_name}'"
                                                     p1 = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, text=True)
                                                     out, err = p1.communicate()                                        
-                                                    if p1.returncode == 0:
-                                                        p1.terminate()
-                                                        p1.kill()
-                                                    else:
+                                                    if p1.returncode != 0:
                                                         logging.warning("could not decode received file!")  
                                                     file_name = ""
                                                     RX_RECEIVING_FILE = False
@@ -1331,12 +1357,12 @@ def main():
                                             else:
                                                 logging.info("< incomplete_file_data["+seq_tx_str+","+seq_tx_acked_str+"]")
                                         # repeated file message
-                                        else:                                    
+                                        else:
                                             logging.info("< repeated_file_data["+seq_tx_str+","+seq_tx_acked_str+"]")      
                                             # transmit ACK
                                             ##############
-                                            if NEED_ACK:                                    
-                                                transmit_ack()                              
+                                            if NEED_ACK:
+                                                transmit_ack()
                                     # unknown message type
                                     else:
                                         logging.info("< unknown_message["+seq_tx_str+","+seq_tx_acked_str+"]")
@@ -1364,26 +1390,30 @@ def main():
             command = "./restore_audio_settings.sh &"
             p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
             out, err = p1.communicate()
-            if p1.returncode == 0:
-                p1.terminate()
-                p1.kill()
+
             # brute-force cleanup
+            # Disable mouse + reset terminal (prevent strange characters after Ctrl+C)
+            sys.stdout.write('\033[?1000l\033[?1002l\033[?1006l\033c')
+            sys.stdout.flush()
+            subprocess.run('tmux kill-server 2>/dev/null || true', shell=True)
+            subprocess.run('stty sane 2>/dev/null', shell=True)
             #     we could remove this code, as we terminate processes with SIGTERM in tea2adt.py
             #     but then running ./tea2adt directly would not cleanup anymore
             command = "./killtea2adt.sh 2> /dev/null &"
             p1 = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, text=True)
             out, err = p1.communicate()
-            if p1.returncode == 0:
-                p1.terminate()
-                p1.kill()
+            if REMOTE_SHELL:
+                os.close(pipe_shell_in)
+                os.unlink(PIPE_SHELL_IN)
             exit(0)
         except Exception as e:
             logging.exception(str(e))
-            
+
     # main loop was exit
     ####################
     # clean up 
     ##########
+    # TODO: remove unreachable code?
     os.close(pipe_shell_in)
     os.unlink(PIPE_SHELL_IN)
 
