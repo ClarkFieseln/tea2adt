@@ -54,8 +54,12 @@ def main():
     # read configured terminal
     TERMINAL = f.read().splitlines()[0]
     f.close()
-    # with the following line, no message or stack trace will be printed when the program is exit with Ctrl+C
-    signal(SIGINT, lambda _, __: exit())
+    # with exit() in the following code, no message or stack trace will be printed when the program is exit with Ctrl+C
+    # in addition we make sure that the tmux session gets killed
+    signal(SIGINT, lambda _, __: (
+        subprocess.run('tmux kill-session -t session_llm 2>/dev/null || true', shell=True),
+        exit()
+    ))
     # parse arguments
     #################
     if len(sys.argv) > 1:
