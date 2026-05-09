@@ -3,7 +3,12 @@ if [ "${HALF_DUPLEX}" == true ] ; then
     # mute mic
     ./mute_mic.sh
     # call minimodem tx passing echoed string passed to this source
-    xargs -0 -I {} echo {} | minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 --sync-byte ${SYNCBYTE} --volume 1.0 ${BAUD}
+    # NOTE: minimodem -> file -> play i.o. just using minimodem will get rid of glitches/pauses e.g. when using low-quality audio drivers
+    xargs -0 -I {} printf '%s\n' {} | minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 --sync-byte ${SYNCBYTE} --volume 1.0 ${BAUD} --file ${HOME}${TMP_PATH}/state/minimodem_out.wav -R 48000 && \
+    play --buffer 65536 ${HOME}${TMP_PATH}/state/minimodem_out.wav -q
+    ##add silence before and after
+    ##sox ${HOME}${TMP_PATH}/state/minimodem_out.wav ${HOME}${TMP_PATH}/state/minimodem_padded.wav pad 0.1 0.1
+    ##play --buffer 65536 ${HOME}${TMP_PATH}/state/minimodem_padded.wav   
     # SET_COMM_IFS
     # WORKAROUND: add a character (e.g. P) in case we have no preamble which leads to the following tmux problem:
     #             usage: send-keys [FHlMRX] [-N repeat-count] [-t target-pane] key ...
@@ -15,7 +20,12 @@ if [ "${HALF_DUPLEX}" == true ] ; then
     ./unmute_mic.sh
 else
     # call minimodem tx passing echoed string passed to this source
-    xargs -0 -I {} echo {} | minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 --sync-byte ${SYNCBYTE} --volume 1.0 ${BAUD}
+    # NOTE: minimodem -> file -> play i.o. just using minimodem will get rid of glitches/pauses e.g. when using low-quality audio drivers
+    xargs -0 -I {} printf '%s\n' {} | minimodem --tx --ascii --quiet --startbits 1 --stopbits 1.0 --sync-byte ${SYNCBYTE} --volume 1.0 ${BAUD} --file ${HOME}${TMP_PATH}/state/minimodem_out.wav -R 48000 && \
+    play --buffer 65536 ${HOME}${TMP_PATH}/state/minimodem_out.wav -q
+    ##add silence before and after
+    ##sox ${HOME}${TMP_PATH}/state/minimodem_out.wav ${HOME}${TMP_PATH}/state/minimodem_padded.wav pad 0.1 0.1
+    ##play --buffer 65536 ${HOME}${TMP_PATH}/state/minimodem_padded.wav
     # SET_COMM_IFS
     # WORKAROUND: add a character (e.g. P) in case we have no preamble which leads to the following tmux problem:
     #             usage: send-keys [FHlMRX] [-N repeat-count] [-t target-pane] key ...
