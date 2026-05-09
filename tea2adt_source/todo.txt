@@ -1,3 +1,57 @@
+- *** in ShellTransmitThread() in mmrx.py use shlex.quote(shell_output) as in LLM
+  - processing of characters ",*,etc.:
+    - in chat with LLM (if " is not closed then we have a problem!)
+    - in TTS output (?)
+    - also in shell or file-transfer (?)
+- *** make ollama work again (via tmux session or programmatically or with HTTP-Requests)
+      use AI-Agent as reference implementation which keeps a session alive through complete interaction
+- add a new configuration parameter for termux-volume and print it during startup, similar to the other volumes
+  (of course: code used only if termux available, see if clause in set_volumes() in tea2adt)
+- try messengers: TRIFA / Session / Toxic / uTox / Toxygen / Venom / Matrix-Element
+  (aTox NOK / simplex chat NOK)
+  try SIP-Tools (G.711, EC/VAD off): Zoiper / Sipnetic
+  try custom SIP/VoIP setup
+  try smartphone-based solution (without PC): smart(Termux)-smart(voice-call)  <--->  smart(voice-call)-smart(Termux)
+  - no echo-supression, etc...
+  - adapt settings as needed
+  ** Chirps-libary i.o. minimodem?...when we could use any Messenger-App
+     (** ggwave looks also very promising, seems to handle DSP-hostile environment problems)
+     (scipy can generate and detect chrips without dedicatec library!)
+     Chirps (swept-frequency signals) are more robust to DSP interference because energy is spread across a frequency range rather than concentrated at fixed tones.
+     Echo cancellers and noise suppressors tend to target steady-state tones - a chirp is harder to mistake for "noise to remove".
+     Chirp-based systems (like those used in LoRa, bat echolocation, radar) are inherently more resilient to multipath and partial distortion.
+- test offline chat apps communicating over bluetooth or wifi
+  check apps for:
+  wireless ad hoc network (WANET)
+  mobile ad hoc network (MANET)
+  smartphone ad hoc network (SPAN)
+  e.g.: 
+  P2P Offline Call (only Android 13 ?)
+  NOKs:
+  -----
+  Bridgefy (Google account? -> chinese text, bad reviews),
+  Briar (only text messenger, no call),
+  Bluetooth Chat (only chat and images, and only Bluetooth), 
+  Signal Offline Messenger (not available, like many other apps),
+  TrueConf(WiFi - but Google account? -> email not accepted!), ...
+- tgpt emojis not received (spaces shown instead). Check EMOJI_PATTERN in mmrx.py
+- SST (speech-to-text):
+  - termux-speech-to-text | tgpt
+    (or vosk?)
+  - PC: implement it or document how to configure
+- check at startup if the configured terminal is available and use system default instead or install with sudo apt install as required
+- IFs 44100Hz/48000Hz: 
+  check sample-rate of IFs and use supported sample rates instead of fix 48000Hz
+- extend session initialization to support AUTONEGOTIATION, that is, agreement on:
+  - protocol version
+  - BAUD
+  - NEED_ACK
+  - determine the round-trip delay "automatically"
+    (use this value i.o. retransmission_timeout_sec or update retransmission_timeout_sec,
+     this value can also be checked during the user session in order to monitor it dinamically e.g. in order to re-adjust it)
+  - etc.
+  Use default 300 or 1200 baud for initialzation, then switch to negotiated transfer rate.
+  *** ADJUST VOLUMES on both sides AUTOMATICALLY during session initialization also !!! *** 
 - shell: interactive sessions, e.g. with calc or python, during remote shell are possible
          but this is not the case e.g. when calling python -> implement (move session to sub-shell?)   
     solution using expect (need sudo apt install expect):
@@ -20,23 +74,19 @@
          label .msg -text "Hello from wish"
          pack .msg
          (shows a small window with that text!)
-- SIP and cellphone tests:
-    - chat, shell:   termux (HUAWEI) - fix SIP (Acer) to fix SIP (Samsung)             - PC (Packard-Bell)
-    - chat, shell:   termux (HUAWEI) - fix SIP (Acer) to cellphone (Samsung, WLAN off) - PC (Packard-Bell)
-- start a presistent ollama session? e.g. to continue chat after some days
+- improvement:
+  configurable option: prevent user input during transmission (indicated by missing prompt cursor)? -> adapt mmtx.sh
+- GUI-PoC
+  e.g. with wish(TCL), sliders, buttons, mouse, joystick (option no ACK), serialize events
+- start a 'long-term' persistent LLM session? e.g. to continue chat after some days
   support from ollama v0.6.3 onwards?
   here an example:
   session_id=$(ollama run $model --session)
   response=$(ollama run $model --session "$session_id" "$input")
-- processing of characters ",*,etc.:
-  - in chat with LLM (if " is not closed then we have a problem!)
-  - in TTS output (?)
-  - also in shell or file-transfer (?)
-- STT: 
-  implement it or document how to configure
 - TTS:
   loop used to replace sleep ${WAIT_START_TTS_SEC} in tts.sh is not working, find out why
   the current hard-coded values may not work properly in every system
+- plausibility checks on configuration parameters
 - GUI (option -g):
   - add sub-menus, e.g. showing selection options from available interfaces in order to select them for communication, TTS, STT
   - add support to restore cfg to default values
@@ -55,13 +105,6 @@
      Decide wether to use it and lose support for festival - and probably other TTS tools.
      A generic solution using virtual sinks and load-module works fine but it's too complex and brings problems when reloading modules.
      Nevertheless, this seems to be the correct solution to set audio interfaces once.)
-- extend session initialization to support AUTONEGOTIATION, that is, agreement on:
-  - protocol version
-  - BAUD
-  - NEED_ACK
-  - etc.
-  Use default 300 or 1200 baud for initialzation, then switch to negotiated transfer rate.
-  *** ADJUST VOLUMES on both sides AUTOMATICALLY during session initialization also !!! ***
 - GUI like AC4QGP:
   "merge" AC4QGP and tea2adt or just "pipe" adapted AC4QGP to tea2adt
   (we may need to use AT commands or something like that)
@@ -69,34 +112,14 @@
 - sniffer: add new option and file mmrxsniff.sh
            with no pwd: like mmrxnopwd.sh but removing the ACKs
            can also easily reuse mmrx.sh to impl. sniffer?
-           otherwise, with mmrx.py
-- new option to use tmux split-window -v i.o. konsole -e -> just config?
-- check at startup if the configured terminal is available and use system default instead or install with sudo apt install as required
+           otherwise, implement with mmrx.py
 - use case with 2 offline-devices, test interface configuration:
     the Receiver offline-device could as well receive over a 2nd audio interface the data being sent and then decrypt it to show the complete conversation on the same screen:
                         ----->  receiver     <--
           internet-PC                           | 2nd. audio interface 
                         <-----  transmitter  -->
 - PEP8 for python code
-- improvement:
-  configurable option: prevent user input during transmission (indicated by missing prompt cursor)? -> adapt mmtx.sh
-- create a new optional parameter to determine the round-trip delay "automatically" and use this value i.o. retransmission_timeout_sec
-  this value can also be checked during the user session in order to monitor it dinamically e.g. in order to re-adjust it
 - use regular expressions to detect damaged "-----BEGIN PGP MESSAGE-----" and "-----END PGP MESSAGE-----" and restore them
-- test offline chat apps communicating over bluetooth or wifi
-  check apps for:
-  wireless ad hoc network (WANET)
-  mobile ad hoc network (MANET)
-  smartphone ad hoc network (SPAN)
-  e.g.: 
-  P2P Offline Call (only Android 13 ?)
-  NOKs:
-  -----
-  Bridgefy (Google account? -> chinese text, bad reviews),
-  Briar (only text messenger, no call),
-  Bluetooth Chat (only chat and images, and only Bluetooth), 
-  Signal Offline Messenger (not available, like many other apps),
-  TrueConf(WiFi - but Google account? -> email not accepted!), ...
 - BUG: verbose = true:
       produces glitches which in turn produce "binary data" = lack of sync, leading to very unstable behavior
       find out how to avoid this or remove this feature!
@@ -127,7 +150,6 @@
 - improvement: performance:
   implement everything in C or C++ to gain speed, readability, etc.
   (relatively small performance gain, e.g. of 15ms, as the biggest delays are introduced by gpg and minimodem)
-- plausibility checks on configuration parameters
 - similar to TFC-Installation: protection measures (see here: https://github.com/maqp/tfc/wiki/Threat-model)
-TLS-MITM attack during installation
-As long as the user has a way (face-to-face meeting with the developer or web of trust) to obtain the authentic fingerprint of the PGP key used to sign the installer, installation is mostly secure against MITM attacks. TFC is installed with a one-liner, the pinned SHA256 fingerprint of which authenticates the 4096-bit PGP/RSA signature verification key, which in turn authenticates the installer. If the attacker has a sufficient universal quantum computer that is capable of running Shor's algorithm, the authenticity of the installer cannot be reliably guaranteed with PGP signatures. The installer comes with pinned SHA512 hashes of all files downloaded from TFC's GitHub repository. These files include the requirements*.txt-files that contain the SHA512 hashes for dependencies downloaded over PIP. However, TFC requires dependencies (namely git, libssl-dev, net-tools, python3-pip, python3-setuptools, python3-tk, and Tor) that are downloaded with APT, and while the related public signature verification key is pinned to the OS, the exfiltration security of the private signing keys of third parties cannot be guaranteed.
+    TLS-MITM attack during installation
+    As long as the user has a way (face-to-face meeting with the developer or web of trust) to obtain the authentic fingerprint of the PGP key used to sign the installer, installation is mostly secure against MITM attacks. TFC is installed with a one-liner, the pinned SHA256 fingerprint of which authenticates the 4096-bit PGP/RSA signature verification key, which in turn authenticates the installer. If the attacker has a sufficient universal quantum computer that is capable of running Shor's algorithm, the authenticity of the installer cannot be reliably guaranteed with PGP signatures. The installer comes with pinned SHA512 hashes of all files downloaded from TFC's GitHub repository. These files include the requirements*.txt-files that contain the SHA512 hashes for dependencies downloaded over PIP. However, TFC requires dependencies (namely git, libssl-dev, net-tools, python3-pip, python3-setuptools, python3-tk, and Tor) that are downloaded with APT, and while the related public signature verification key is pinned to the OS, the exfiltration security of the private signing keys of third parties cannot be guaranteed.
