@@ -1,9 +1,4 @@
 - check if settings in $HOME/.sound, $HOME/.bashrc and $PREFIX/etc/pulse/default.pa are actually needed for Termux
-- *** in ShellTransmitThread() in mmrx.py use shlex.quote(shell_output) as in LLM
-  - processing of characters ",*,etc.:
-    - in chat with LLM (if " is not closed then we have a problem!)
-    - in TTS output (?)
-    - also in shell or file-transfer (?)
 - *** make ollama work again (via tmux session or programmatically or with HTTP-Requests)
       use AI-Agent as reference implementation which keeps a session alive through complete interaction
 - add a new configuration parameter for termux-volume and print it during startup, similar to the other volumes
@@ -35,6 +30,16 @@
   Bluetooth Chat (only chat and images, and only Bluetooth), 
   Signal Offline Messenger (not available, like many other apps),
   TrueConf(WiFi - but Google account? -> email not accepted!), ...
+- *** processing of characters ", etc.:
+    - in chat with LLM, if " is not closed then we have a problem!
+      (I think we never solved that problem in ollama either?)
+    - check shlex.quote(llm_output) in mmrx.py:
+      Problems with quoted strings:
+        < say this: "aaa
+        /data/data/com.termux/files/usr/bin/sh: 1: Syntax error: Unterminated quoted string
+      or:
+        < can you read this, if yes just echo it to me exactly: (this is what you shall read**+!"%&§)
+        /data/data/com.termux/files/usr/bin/sh: 1: Syntax error: ")" unexpected
 - tgpt emojis not received (spaces shown instead). Check EMOJI_PATTERN in mmrx.py
 - SST (speech-to-text):
   - termux-speech-to-text | tgpt
@@ -43,6 +48,8 @@
 - check at startup if the configured terminal is available and use system default instead or install with sudo apt install as required
 - IFs 44100Hz/48000Hz: 
   check sample-rate of IFs and use supported sample rates instead of fix 48000Hz
+- check handling of Ctrl+C to exit tea2adt
+  currently there is code for that in tea2adt.py, tea2adt and mmrx.py and it is not clear what kills what when and under which conditions
 - extend session initialization to support AUTONEGOTIATION, that is, agreement on:
   - protocol version
   - BAUD
