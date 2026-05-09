@@ -1,5 +1,5 @@
 # tea2adt
-tea2adt is a command-line utility for Chat, Remote Shell, Remote AI Prompt and File Transfer, that reads and writes encrypted data across peer-to-peer or broadcast audio connections, using [minimodem](https://github.com/kamalmostafa/minimodem "minimodem") and [gpg](https://github.com/gpg/gnupg "gpg").
+tea2adt is a Linux command-line utility for Chat, Remote Shell, Remote AI Prompt and File Transfer, that reads and writes encrypted data across peer-to-peer or broadcast audio connections, using [minimodem](https://github.com/kamalmostafa/minimodem "minimodem") and [gpg](https://github.com/gpg/gnupg "gpg").
 
 It is a powerful tool that can be combined with any audio infrastructure (like PSTN, cellular network, internet, radio, walkie-talkies) to provide a secure communication channel through an audio tunnel.
 
@@ -65,6 +65,12 @@ Capture audio with [Audacity](https://www.audacityteam.org/) in parallel and mak
 
 If the signal is distored you may need to lower the baudrate in the configuration file cfg/baud until you see clear sine waves.
 
+In Termux, instead of Audacity you may use e.g.:
+
+```
+termux-microphone-record -f ~/recording.aac -l 0 -e aac -r 48000 -c 1
+```
+
 Once you find the correct values you can enter them in:
 ```
 cfg/volume_microphone
@@ -73,7 +79,7 @@ cfg/volume_speaker_left
 
 cfg/volume_speaker_right
 ```
-Next time these settings will be used automatically. tea2adt sets the system audio levels for you.
+Next time these settings will be used automatically by tea2adt.
 
 To avoid automatic setting of volumes just leave the parameters empty.
 
@@ -114,7 +120,7 @@ When using direct cable connections, life-signs may be required in order to keep
 
 Though, when using walkie-talkies, a start_msg may be required instead in order to maintain the communication for longer than 3 minutes. At least, that seems to be the maximum time that the specific devices I used tolerate in transmission mode.
 
-Yet, when using messengers on a smartphone, like Skype or aTox, a preamble may be required instead.
+Yet, when using messengers on a smartphone, like aTox, a preamble may be required instead.
 
 ## Security
 The main security features are provided by [GnuPG](https://github.com/gpg/gnupg), also known as [GPG](https://github.com/gpg/gnupg).
@@ -125,7 +131,9 @@ But the final and most important security step is to make sure that the device r
 
 If possible, the device has to remain offline all the time.
 
-Remember also to switch off all other vulnerable interfaces such as bluetooth and USB, and even GPS. The goal is to keep your device fully air gapped.
+Remember also to switch off all other vulnerable interfaces such as bluetooth and USB, and even GPS. The goal is to keep your device as far as possible 'air gapped'.
+
+I deliberately did not mention the additional security provided by the audio infrastructure, such as end-to-end encryption in messaging apps or SIP encryption. I consider these features optional and complementary. On the one hand, I still distrust most providers; on the other hand, these apps run on an online device, where end-node security can no longer be fully guaranteed. Remember that our data reaches the online devices already encrypted, while keys and passwords remain securely stored on the offline devices and cannot be leaked. Similarly, any flaws or vulnerabilities in the voice call app can largely be ignored, as it functions simply as a modern replacement for a traditional landline telephone.
 
 ## Shell
 The shell is "persistent" over the complete session. 
@@ -134,7 +142,7 @@ This allows consecutive commands to remain in the same context (path, environmen
 But not only the remote user can make use of the reverse-shell, also the local user can do it, e.g.:
 ### single command
 ```
-echo "ls" > /home/user/tmp/tea2adt/tmp/pipe_shell_in
+printf '%s\n' "ls" > /home/user/tmp/tea2adt/tmp/pipe_shell_in
 ```
 ### interactive input
 ```
@@ -159,10 +167,10 @@ or it may connect directly through an audio cable to another offline device (960
 
 Note that the online device may be a smartphone, desktop PC, walkie-talkie or anything else: tablet, laptop, landline telephone, ...
 
-### Termux (Android 9)
+### Termux (Android 9, Android 12, Android 16)
 tea2adt can also be easily installed in Termux. See [instructions](https://github.com/ClarkFieseln/tea2adt/blob/main/doc/Termux/instructions.md) for more information.
 
-Positive tests done with 2 offline smartphones with tea2adt running in Termux on Android9 at 2400 bit/s. These devices communicate over 2 PCs, each running qTox with a call session between them.
+Positive tests done with 2 offline smartphones with tea2adt running in Termux on Android at 1200 bit/s. These devices communicate over 2 PCs, each running qTox with a call session between them.
 
 ## Not working environments
 Initially, some other environments have been shortly tested without much success:
@@ -199,3 +207,80 @@ Initially, some other environments have been shortly tested without much success
 
 ### Kali NetHunter in Termux (Android 9)
 - installation not possible due to insufficient storage (despite 12 GB free storage!)
+
+## Voice-band data over VoIP
+### Audio Processing (CRITICAL)
+When using standard messaging apps for audio-calls you may encounter several problems.
+Here some recommendations you shall consider if available:
+#### Disable
+- Echo Cancellation (AEC) 
+- Noise Suppression (NS) 
+- Automatic Gain Control (AGC) 
+- Voice Activity Detection (VAD) 
+- Silence suppression / comfort noise (CNG) 
+- “HD voice enhancement” 
+- “AI noise reduction” 
+- packet loss concealment (important for tone integrity tests) 
+- SRTP encryption if testing baseline behavior (optional tradeoff)
+
+#### Settings
+- RTP packet size: 20 ms or 30 ms 
+- Jitter buffer: 
+  - start with fixed mode if available 
+  - otherwise low adaptive range (e.g. 50–150 ms) 
+- Codec: PCMU only 
+- Transport: UDP
+
+Given the very specific “transparent audio pipe for modem/data tones” use case, we need to look beyond mainstream messengers and toward apps/protocols that let you control the voice path more directly.
+
+### Messengers
+Up to now I have used qTox extensively in order to make voice calls to transport the audio data.
+It works very well and very reliably.
+
+Here you find the active fork: 
+https://github.com/TokTok/qTox
+
+In future I will take a look at the following alternatives:
+- Toxic
+- uTox
+- Toxygen
+- Venom
+- Session
+- Matrix/Element
+
+
+### Best candidates for SIP softphones with configurable codecs / transport
+These often expose more codec and telephony settings than privacy messengers.
+
+    Linphone
+
+Supports HD audio/video, end-to-end encryption (ZRTP/SRTP/TLS), push notifications, and works across Android, iOS, Windows, macOS, and Linux, compatible with any SIP provider.
+Key supported audio codecs include Opus (HD), G.722, G.729, PCMA (G.711 A-law), PCMU (G.711 μ-law), Speex, iLBC, GSM, AMR (with non-free build), G.719, SILK variants, and linear PCM (slin).
+
+    Zoiper
+
+Supports multiple codecs including G.711/GSM and is built as a SIP softphone rather than a chat messenger.
+
+    Sipnetic
+
+Modern SIP client with codec support including G.711 and others.
+
+Traditional SIP stacks sometimes behave better for voice-band data than messenger apps because they’re closer to telephony assumptions and may support “rawer” codec choices.
+
+### Technical approach most likely to help
+For modem-over-VoIP, you generally want:
+
+- G.711 / μ-law / A-law codec if available
+    - minimal compression / least destructive to tones 
+    - common recommendation for voice-band data over VoIP
+- Disable VAD / silence suppression / echo cancellation if the app exposes it 
+    - many SIP clients expose more of this than messengers
+- Use direct electrical coupling instead of speaker/mic 
+    - even if the acoustic setup proposed above works fine, it adds another failure point 
+
+You need to optimize for:
+
+- stable continuous waveform transmission 
+- minimal DSP interference 
+- predictable latency + jitter 
+- no auto-muting / speech detection
