@@ -34,7 +34,7 @@ BAUD=$(head -n 1 ${HOME}${TMP_PATH}/cfg/baud)
 SYNCBYTE=$(head -n 1 ${HOME}${TMP_PATH}/cfg/syncbyte)
 RETRANSMISSION_TIMEOUT_SEC=$(head -n 1 ${HOME}${TMP_PATH}/cfg/retransmission_timeout_sec)
 # convert RETRANSMISSION_TIMEOUT_SEC to ms:
-RETRANSMISSION_TIMEOUT_MS=$(echo ${RETRANSMISSION_TIMEOUT_SEC}*1000 | bc)
+RETRANSMISSION_TIMEOUT_MS=$(printf '%s\n' ${RETRANSMISSION_TIMEOUT_SEC}*1000 | bc)
 # and now remove decimal values:
 RETRANSMISSION_TIMEOUT_MS=${RETRANSMISSION_TIMEOUT_MS%.*}
 TIMEOUT_POLL_SEC=$(head -n 1 ${HOME}${TMP_PATH}/cfg/timeout_poll_sec)
@@ -68,7 +68,7 @@ SEQ_TX_ACKED=$(head -n 1 ${SEQ_TX_ACKED_FILE})
 SEQ_RX_NEW=$(head -n 1 ${SEQ_RX_FILE})            
 if [[ ${SEQ_RX_NEW} != ${INVALID_SEQ_NR} ]] ; then
     # clean state and update variable
-    echo ${INVALID_SEQ_NR} > ${SEQ_RX_FILE}
+    printf '%s\n' ${INVALID_SEQ_NR} > ${SEQ_RX_FILE}
     # SEQ_RX to be acknowledged
     SEQ_RX=${SEQ_RX_NEW}
 else
@@ -81,7 +81,7 @@ seq_rx_ascii=$(printf "\x$(printf %x $seq_rx)")
 
 # store session input in temporary file
 #######################################
-echo "$@" > ${TMPFILE};
+printf '%s\n' "$@" > ${TMPFILE};
 
 # update SEQ_TX
 ###############
@@ -102,7 +102,7 @@ for f in ${TMPFILE}"_split"*;
 do           
     # prepare before send
     current_retransmissions=0
-    seq_tx=$((SEQ_TX+33))      
+    seq_tx=$((SEQ_TX+33))
     seq_tx_ascii=$(printf "\x$(printf %x $seq_tx)")   
                          
     # retransmission loop
@@ -112,41 +112,41 @@ do
     do
         # prepare send
         ##############
-        SEQ_RX_NEW=$(head -n 1 ${SEQ_RX_FILE})            
+        SEQ_RX_NEW=$(head -n 1 ${SEQ_RX_FILE})
         if [[ ${SEQ_RX} != ${INVALID_SEQ_NR} ]] && [[ ${SEQ_RX_NEW} != ${INVALID_SEQ_NR} ]] ; then
             # clean state and update variable
-            echo ${INVALID_SEQ_NR} > ${SEQ_RX_FILE}
+            printf '%s\n' ${INVALID_SEQ_NR} > ${SEQ_RX_FILE}
             # SEQ_RX to be acknowledged in data message
             SEQ_RX=${SEQ_RX_NEW}
             seq_rx=$((SEQ_RX+33))
             seq_rx_ascii=$(printf "\x$(printf %x $seq_rx)") 
         fi
-           
+
         # build and encrypt data-chunk
         ##############################
         if [[ ${PREAMBLE} == "" && ${TRAILER} == "" ]] ; then
-            echo "${seq_tx_ascii}${seq_rx_ascii}[data]$(<${f} )" | source gpg.src
+            printf '%s\n' "${seq_tx_ascii}${seq_rx_ascii}[data]$(<${f} )" | source gpg.src
         else
-            echo -n ${PREAMBLE} > ${MSGFILE}
-            echo "${seq_tx_ascii}${seq_rx_ascii}[data]$(<${f} )" | source gpgappend.src
+            printf '%s' ${PREAMBLE} > ${MSGFILE}
+            printf '%s\n' "${seq_tx_ascii}${seq_rx_ascii}[data]$(<${f} )" | source gpgappend.src
             if [ "${TRAILER}" != "" ] ; then
-                echo ${TRAILER} >> ${MSGFILE}
+                printf '%s\n' ${TRAILER} >> ${MSGFILE}
             fi
         fi
-        
+
         # send message with encrypted data-chunk
         ########################################
         if [ "${VERBOSE}" == true ] ; then
-            echo "> data[${SEQ_TX},${SEQ_RX}] try ${current_retransmissions}"
-        fi        
+            printf '%s\n' "> data[${SEQ_TX},${SEQ_RX}] try ${current_retransmissions}"
+        fi
         # send start_msg?
         if [ "${START_MSG}" != "" ] ; then
-            echo "${START_MSG}" | source tx.src
+            printf '%s\n' "${START_MSG}" | source tx.src
         fi
         cat ${MSGFILE} | source tx.src
         # add end_msg?
         if [ "${END_MSG}" != "" ] ; then
-            echo "${END_MSG}" | source tx.src
+            printf '%s\n' "${END_MSG}" | source tx.src
         fi
         # show session output on local console
         if [[ ${current_retransmissions} -eq 0 ]] ; then
@@ -156,23 +156,23 @@ do
         for ((i=1; i<=${REDUNDANT_TRANSMISSIONS}; i++))
         do
             if [ "${VERBOSE}" == true ] ; then
-                echo ">> data[${SEQ_TX},${SEQ_RX}] transmitted redundant message times = ${i}"
+                printf '%s\n' ">> data[${SEQ_TX},${SEQ_RX}] transmitted redundant message times = ${i}"
             fi
             # NOTE: no start_msg needed for redundant messages
             cat ${MSGFILE} | source tx.src
             # add end_msg?
             if [ "${END_MSG}" != "" ] ; then
-                echo "${END_MSG}" | source tx.src
-            fi  
-        done          
+                printf '%s\n' "${END_MSG}" | source tx.src
+            fi
+        done
         start_poll_ms=$(date +%s%3N)            
-                
+
         # loop to poll retransmission timeout
         #####################################
         # wait ACK by polling state/seq_tx_acked
         # in parallel check if need to send ACK
         while sleep $TIMEOUT_POLL_SEC
-        do                        
+        do
             # received ACK?
             ###############
             SEQ_TX_ACKED=$(head -n 1 ${SEQ_TX_ACKED_FILE})
@@ -180,17 +180,17 @@ do
             elapsed_time_ms=$((now_ms-start_poll_ms))                    
             if [ "${NEED_ACK}" == "false" ] || [[ ${SEQ_TX_ACKED} == ${SEQ_TX} ]] ; then
                 # store SEQ_TX after it was acknowledged
-                echo ${SEQ_TX} > ${SEQ_TX_FILE}
+                printf '%s\n' ${SEQ_TX} > ${SEQ_TX_FILE}
                 # now increase SEQ_TX for next chunk
                 SEQ_TX=$(((SEQ_TX+1)%94))
                 if [ "${VERBOSE}" == true ] && [[ ${SEQ_TX_ACKED} == ${SEQ_TX} ]]; then
-                    total_elapsed_time_ms=$(echo ${current_retransmissions}*${RETRANSMISSION_TIMEOUT_MS}+${elapsed_time_ms} | bc)                      
-                fi                        
+                    total_elapsed_time_ms=$(printf '%s\n' ${current_retransmissions}*${RETRANSMISSION_TIMEOUT_MS}+${elapsed_time_ms} | bc)
+                fi
                 rm ${f}
                 # signal to exit outer loop
                 current_retransmissions=-1
                 # send next chunk
-                break                                        
+                break
             # retransmit?
             #############
             # TODO: subtract TIMEOUT_POLL_SEC (in milliseconds) from RETRANSMISSION_TIMEOUT_MS
@@ -199,7 +199,7 @@ do
                 # max. retransmission exceeded?
                 if [[ ${current_retransmissions} -gt ${MAX_RETRANSMISSIONS} ]] ; then
                     # we exit with an error message
-                    echo "ERROR: maximum nr. of retransmissions (${MAX_RETRANSMISSIONS}) exceeded!"
+                    printf '%s\n' "ERROR: maximum nr. of retransmissions (${MAX_RETRANSMISSIONS}) exceeded!"
                     sleep 5
                     # some error code between 1 and 255
                     exit 200
@@ -207,50 +207,50 @@ do
                     # signal to exit outer loop
                     # current_retransmissions=-1
                     # break
-                fi 
+                fi
                 current_retransmissions=$((current_retransmissions+1))
                 # retransmit
-                break                       
+                break
             else
                 : # continue polling if ACK received                            
-            fi      
+            fi
             # send ACK?
       	    ###########
             if [ "${NEED_ACK}" == "true" ] ; then
                 SEQ_RX_NEW=$(head -n 1 ${SEQ_RX_FILE})            
                 if [[ ${SEQ_RX} != ${INVALID_SEQ_NR} ]] && [[ ${SEQ_RX_NEW} != ${INVALID_SEQ_NR} ]] ; then
                     # clean state
-                    echo ${INVALID_SEQ_NR} > ${SEQ_RX_FILE}
+                    printf '%s\n' ${INVALID_SEQ_NR} > ${SEQ_RX_FILE}
                     # SEQ_RX to be acknowledged in ACK message
                     SEQ_RX=${SEQ_RX_NEW}
                     seq_rx=$((SEQ_RX+33))
                     seq_rx_ascii=$(printf "\x$(printf %x $seq_rx)")
                     # send ACK without data
                     if [[ ${PREAMBLE} == "" && ${TRAILER} == "" ]] ; then
-                        echo "${seq_tx_ascii}${seq_rx_ascii}[ack]" | source gpg.src
+                        printf '%s\n' "${seq_tx_ascii}${seq_rx_ascii}[ack]" | source gpg.src
                     else
-                        echo -n ${PREAMBLE} > ${MSGFILE}
-                        echo echo "${seq_tx_ascii}${seq_rx_ascii}[ack]" | source gpgappend.src
+                        printf '%s' ${PREAMBLE} > ${MSGFILE}
+                        printf '%s\n' "${seq_tx_ascii}${seq_rx_ascii}[ack]" | source gpgappend.src
                         if [ "${TRAILER}" != "" ] ; then
-                            echo ${TRAILER} >> ${MSGFILE}
+                            printf '%s\n' ${TRAILER} >> ${MSGFILE}
                         fi
                     fi
                     # send message with encrypted data
                     if [ "${VERBOSE}" == true ] ; then
-                        echo "> ack[${SEQ_TX},${SEQ_RX}]"
-                    fi                  
+                        printf '%s\n' "> ack[${SEQ_TX},${SEQ_RX}]"
+                    fi
                     # send start_msg?
                     if [ "${START_MSG}" != "" ] ; then
-                        echo "${START_MSG}" | source tx.src
+                        printf '%s\n' "${START_MSG}" | source tx.src
                     fi
                     # send ACK
                     cat ${MSGFILE} | source tx.src
                     # add end_msg?
                     if [ "${END_MSG}" != "" ] ; then
-                        echo "${END_MSG}" | source tx.src
+                        printf '%s\n' "${END_MSG}" | source tx.src
                     fi
-      	        fi
-      	    fi                        
+      	        fi # new ACK
+      	    fi # send ACK
         done # while poll ACK
     done # while retransmissions
 done # while TX data-chunks
