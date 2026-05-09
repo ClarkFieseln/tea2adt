@@ -10,16 +10,16 @@ VERSION=$(head -n 1 version)
 INSTALL_DEPENDENCIES=$(head -n 1 cfg/install_dependencies)
 if [ "${INSTALL_DEPENDENCIES}" == true ] ; then
     read -p "Do you want to install dependencies(y/Y)? " -n 1 -r
-    echo    # (optional) move to a new line
+    printf '%s\n'    # (optional) move to a new line
     if [[ $REPLY =~ ^[Yy]$ ]]
     then
-        echo "-------------------------------------------"
+        printf '%s\n' "-------------------------------------------"
         ${TERMINAL} ./install_dependencies.sh
-        echo "-------------------------------------------"
+        printf '%s\n' "-------------------------------------------"
     else
         read -p "Please install dependencies by hand as described in the documentation, cfg/install_dependencies will be set to false"
     fi
-    echo "false" > cfg/install_dependencies
+    printf '%s\n' "false" > cfg/install_dependencies
 fi 
         
 # first remove previous temporary working folder
@@ -58,7 +58,7 @@ VOLUME_TTS_OUT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/volume_tts_out)
 LLM_CMD=$(head -n 1 ${HOME}${TMP_PATH}/cfg/llm_cmd)
 
 # SET_COMM_IFS
-# WORKAROUND: for now, clear audio interfaces for communication in case they were set altough not yet supported
+# WORKAROUND: for now, clear audio interfaces for communication in case they were set although not yet supported
 if [ "${INTERFACE_INDEX_MINIMODEM_IN}" != "" ] ; then
     printf "INTERFACE_INDEX_MINIMODEM_IN is not supported yet. The default audio interfaces will be used instead."
     INTERFACE_INDEX_MINIMODEM_IN=
@@ -69,17 +69,21 @@ if [ "${INTERFACE_INDEX_MINIMODEM_OUT}" != "" ] ; then
 fi
 
 trap ctrl_c INT
-
 function ctrl_c()
 {
     # TODO: kill child/started processes before ctrl-c
     # kill $(ps -s $$ -o pid=)
     # pkill -P $$
     # restore mic volume
-    ${TERMINAL} ./restore_audio_settings.sh &
+    ${TERMINAL} ./restore_audio_settings.sh  # &
     # TODO: brute-force kill?
-    ./killtea2adt.sh 2> /dev/null &
-    # and now ctr-c
+    # Disable mouse + reset (in case tmux was config. with mouse)
+    # otherwise we may get strange characters in the terminal after Ctrl+C
+    printf '\033[?1000l\033[?1002l\033[?1006l\033c'
+    tmux kill-server 2>/dev/null || true
+    stty sane 2>/dev/null || true
+    ./killtea2adt.sh 2> /dev/null  # &
+    # and now ctrl-c
     trap - INT
     kill -INT $$
 }
@@ -99,7 +103,7 @@ set_interfaces()
         done
         # set configured sink for this specific sink-input
         pactl move-sink-input ${SINK_INPUT} ${INTERFACE_INDEX_MINIMODEM_OUT}
-        echo "set minimodem output with sink input ${SINK_INPUT} to interface index ${INTERFACE_INDEX_MINIMODEM_OUT}"
+        printf '%s\n' "set minimodem output with sink input ${SINK_INPUT} to interface index ${INTERFACE_INDEX_MINIMODEM_OUT}"
     fi
     # microphone / source (communication)
     if [ "${INTERFACE_INDEX_MINIMODEM_IN}" != "" ] ; then
@@ -113,19 +117,32 @@ set_interfaces()
         done
         # set configured source for this specific source-output
         pactl move-source-output ${SOURCE_OUTPUT} ${INTERFACE_INDEX_MINIMODEM_IN}
-        echo "set minimodem input with source output ${SOURCE_OUTPUT} to interface index ${INTERFACE_INDEX_MINIMODEM_IN}"
+        printf '%s\n' "set minimodem input with source output ${SOURCE_OUTPUT} to interface index ${INTERFACE_INDEX_MINIMODEM_IN}"
     fi
 }
 
 set_volumes()
 {
+    # termux
+    # pactl sets later the volume at the PulseAudio/software level,
+    # essentially a multiplier applied within PulseAudio, on top of Android's hardware stream level
+    # so we need to also set Android's volume
+    if [ -n "$TERMUX_VERSION" ] || [[ "$PREFIX" == *"com.termux"* ]]; then
+        if command -v termux-volume &> /dev/null; then
+            # TODO: add config. value for termux-volume (0-15), for now hardcoded
+            termux-volume music 10
+            printf '%s\n' "Termux version "$TERMUX_VERSION" detected"
+        else
+            printf '%s\n' "Termux detected but termux-volume not found (install termux-api)"
+        fi
+    fi
     # speaker
     if [ "${INTERFACE_INDEX_MINIMODEM_OUT}" != "" ] ; then
         if [ "${VOLUME_SPEAKER_LEFT}" != "" ] ; then
             pactl -- set-sink-volume ${INTERFACE_INDEX_MINIMODEM_OUT} ${VOLUME_SPEAKER_LEFT} ${VOLUME_SPEAKER_RIGHT}
-            echo "setting output/speaker volume to L,R = ${VOLUME_SPEAKER_LEFT},${VOLUME_SPEAKER_RIGHT}"
+            printf '%s\n' "setting output/speaker volume to L,R = ${VOLUME_SPEAKER_LEFT},${VOLUME_SPEAKER_RIGHT}"
         fi
-        echo "configured output/speaker, index = " ${INTERFACE_INDEX_MINIMODEM_OUT}
+        printf '%s\n' "configured output/speaker, index = " ${INTERFACE_INDEX_MINIMODEM_OUT}
     else
         if [ "${VOLUME_SPEAKER_LEFT}" != "" ] ; then
             default_sink_index=$(pacmd list-sinks | grep "* index: " | grep -o '...$')
@@ -133,20 +150,20 @@ set_volumes()
                  default_sink_index=$(pacmd list-sinks | grep "* index: " | grep -o '..$')
             fi
             pactl -- set-sink-volume ${default_sink_index} ${VOLUME_SPEAKER_LEFT} ${VOLUME_SPEAKER_RIGHT}
-            echo "setting default output/speaker volume to L,R = "${VOLUME_SPEAKER_LEFT}","${VOLUME_SPEAKER_RIGHT}
-            # echo "(leave cfg/volume_speaker_left empty in order to not set input volume automtatically)"
+            printf '%s\n' "setting default output/speaker volume to L,R = "${VOLUME_SPEAKER_LEFT}","${VOLUME_SPEAKER_RIGHT}
+            # printf '%s\n' "(leave cfg/volume_speaker_left empty in order to not set input volume automtatically)"
         fi
-        # echo default settings for communication
-        echo "default output/speaker, index = " ${default_sink_index}
+        # printf '%s\n' default settings for communication
+        printf '%s\n' "default output/speaker, index = " ${default_sink_index}
     fi
     # mic
     if [ "${INTERFACE_INDEX_MINIMODEM_IN}" != "" ] ; then
         if [ "${VOLUME_MICROPHONE}" != "" ] ; then   
             pactl -- set-source-volume ${INTERFACE_INDEX_MINIMODEM_IN} ${VOLUME_MICROPHONE}
-            echo "setting input/microphone volume to "${VOLUME_MICROPHONE}
-            # echo "(leave cfg/volume_microphone empty in order to not set output volume automtatically)"
+            printf '%s\n' "setting input/microphone volume to "${VOLUME_MICROPHONE}
+            # printf '%s\n' "(leave cfg/volume_microphone empty in order to not set output volume automtatically)"
         fi
-        echo "configured input/microphone, index = " ${INTERFACE_INDEX_MINIMODEM_IN}
+        printf '%s\n' "configured input/microphone, index = " ${INTERFACE_INDEX_MINIMODEM_IN}
     else
         if [ "${VOLUME_MICROPHONE}" != "" ] ; then
             default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '...$')
@@ -154,29 +171,29 @@ set_volumes()
                  default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '..$')
             fi    
             pactl -- set-source-volume ${default_source_index} ${VOLUME_MICROPHONE}
-            echo "setting input/microphone volume to "${VOLUME_MICROPHONE}
-            # echo "(leave cfg/volume_microphone empty in order to not set output volume automtatically)"
+            printf '%s\n' "setting input/microphone volume to "${VOLUME_MICROPHONE}
+            # printf '%s\n' "(leave cfg/volume_microphone empty in order to not set output volume automatically)"
         fi
-        echo "default input/microphone, index = " ${default_source_index}
+        printf '%s\n' "default input/microphone, index = " ${default_source_index}
     fi
     # TTS
     if [ "${TEXT_TO_SPEECH}" != "" ] ; then
         if [ "${VOLUME_TTS_OUT}" != "" ] ; then
             pactl -- set-sink-volume ${INTERFACE_INDEX_TTS_OUT} ${VOLUME_TTS_OUT}
-            echo "setting TTS output/speaker volume = "${VOLUME_TTS_OUT}
+            printf '%s\n' "setting TTS output/speaker volume = "${VOLUME_TTS_OUT}
         fi
     fi
     # STT
     if [ "${SPEECH_TO_TEXT}" == true ] ; then
         if [ "${VOLUME_STT_IN}" != "" ] ; then
             pactl -- set-source-volume ${INTERFACE_INDEX_STT_IN} ${VOLUME_STT_IN}
-            echo "setting STT input/microphone volume = "${VOLUME_STT_IN}
+            printf '%s\n' "setting STT input/microphone volume = "${VOLUME_STT_IN}
         fi
     fi
     # echo TTS and STT settings
-    echo "TTS command = "${TEXT_TO_SPEECH}
-    echo "TTS output/speaker, index = "${INTERFACE_INDEX_TTS_OUT}
-    echo "STT input/microphone, index = "${INTERFACE_INDEX_STT_IN}
+    printf '%s\n' "TTS command = "${TEXT_TO_SPEECH}
+    printf '%s\n' "TTS output/speaker, index = "${INTERFACE_INDEX_TTS_OUT}
+    printf '%s\n' "STT input/microphone, index = "${INTERFACE_INDEX_STT_IN}
 }
 
 create_fifos()
@@ -218,23 +235,23 @@ ask_password()
     do
         while true
         do
-            echo -n "password: "
+            printf '%s' "password: "
             read -ers PASSWORD1
-            echo ""
+            printf '%s\n' ""
             # 2> /dev/null shall prevent showing the password if some error occurs
             if [ ! "${PASSWORD1}" == "" ] 2> /dev/null
             then
                 break
             else
-                echo "Password cannot be empty!"
+                printf '%s\n' "Password cannot be empty!"
             fi
         done
-        echo -n "confirm password: "
+        printf '%s' "confirm password: "
         read -ers PASSWORD
-        echo ""
+        printf '%s\n' ""
         # 2> /dev/null shall prevent showing the password if some error occurs
         [ "${PASSWORD1}" == "${PASSWORD}" ] 2> /dev/null && break
-        echo "Passwords dont match!"
+        printf '%s\n' "Passwords dont match!"
     done
 }
 
@@ -244,14 +261,14 @@ ask_password()
 echo_audio_interfaces()
 {
     # list audio output interfaces
-    echo "audio output interfaces"
-    echo "-----------------------"
-    echo "$(pactl list short sinks)"
+    printf '%s\n' "audio output interfaces"
+    printf '%s\n' "-----------------------"
+    printf '%s\n' "$(pactl list short sinks)"
     # list audio input interfaces
-    echo ""
-    echo "audio input interfaces"
-    echo "----------------------"    
-    echo "$(pactl list short sources)"
+    printf '%s\n' ""
+    printf '%s\n' "audio input interfaces"
+    printf '%s\n' "----------------------"
+    printf '%s\n' "$(pactl list short sources)"
     # default audio output / speaker
     default_sink_index=$(pacmd list-sinks | grep "* index: " | grep -o '...$')
     if [ "${default_sink_index:0:1}" == ":" ] ; then
@@ -261,24 +278,24 @@ echo_audio_interfaces()
     default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '...$')
     if [ "${default_source_index:0:1}" == ":" ] ; then
          default_source_index=$(pacmd list-sources | grep "* index: " | grep -o '..$')
-    fi    
+    fi
     # echo settings
-    echo ""
-    echo "audio settings for communication"
-    echo "--------------------------------"
-    echo "default output/speaker, index = " ${default_sink_index}
-    echo "default input/microphone, index = " ${default_source_index}
-    echo ""
-    echo "audio settings for TTS and STT"
-    echo "--------------------------------"
-    echo "TTS output/speaker, index = " ${INTERFACE_INDEX_TTS_OUT}
-    echo "STT input/microphone, index = " ${INTERFACE_INDEX_STT_IN}
-    echo ""
+    printf '%s\n' ""
+    printf '%s\n' "audio settings for communication"
+    printf '%s\n' "--------------------------------"
+    printf '%s\n' "default output/speaker, index = " ${default_sink_index}
+    printf '%s\n' "default input/microphone, index = " ${default_source_index}
+    printf '%s\n' ""
+    printf '%s\n' "audio settings for TTS and STT"
+    printf '%s\n' "--------------------------------"
+    printf '%s\n' "TTS output/speaker, index = " ${INTERFACE_INDEX_TTS_OUT}
+    printf '%s\n' "STT input/microphone, index = " ${INTERFACE_INDEX_STT_IN}
+    printf '%s\n' ""
 }
 
 echo_help()
 {
-    echo "usage: tea2adt [-c|-s]    		 
+    printf '%s\n' "usage: tea2adt [-c|-s]
     		 -c, --chat
     		 -l, --llm, --llm-chat, --llm-prompt
     		 -s, --rs, --remote-shell, --reverse-shell (to execute a command as sudo type: echo \"<pwd>\" | sudo -k -S <cmd>)
@@ -300,7 +317,7 @@ Homepage: https://github.com/ClarkFieseln/tea2adt"
 
 echo_image()
 {
-    echo "
+    printf '%s\n' "
 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓█▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
@@ -328,26 +345,26 @@ echo_image()
 
 echo_parameters()
 {
-    echo "baud = $BAUD"
-    echo "half_duplex = $HALF_DUPLEX"
-    echo "syncbyte = $SYNCBYTE"
-    echo "confidence = $CONFIDENCE"
-    echo "limit = $LIMIT"
-    echo "terminal = $TERMINAL"
-    echo "volume speaker left = $VOLUME_SPEAKER_LEFT"
-    echo "volume speaker right = $VOLUME_SPEAKER_RIGHT"
-    echo "volume microphone = $VOLUME_MICROPHONE"
-    echo "text to speech = $TEXT_TO_SPEECH"
-    echo "speech to text = $SPEECH_TO_TEXT"
-    echo "volume TTS out = $VOLUME_TTS_OUT"
-    echo "volume STT in = $VOLUME_STT_IN"
+    printf '%s\n' "baud = $BAUD"
+    printf '%s\n' "half_duplex = $HALF_DUPLEX"
+    printf '%s\n' "syncbyte = $SYNCBYTE"
+    printf '%s\n' "confidence = $CONFIDENCE"
+    printf '%s\n' "limit = $LIMIT"
+    printf '%s\n' "terminal = $TERMINAL"
+    printf '%s\n' "volume speaker left = $VOLUME_SPEAKER_LEFT"
+    printf '%s\n' "volume speaker right = $VOLUME_SPEAKER_RIGHT"
+    printf '%s\n' "volume microphone = $VOLUME_MICROPHONE"
+    printf '%s\n' "text to speech = $TEXT_TO_SPEECH"
+    printf '%s\n' "speech to text = $SPEECH_TO_TEXT"
+    printf '%s\n' "volume TTS out = $VOLUME_TTS_OUT"
+    printf '%s\n' "volume STT in = $VOLUME_STT_IN"
 }
 
 echo_version()
 {
-    echo "tea2adt ${VERSION}
+    printf '%s\n' "tea2adt ${VERSION}
 MIT License: <https://opensource.org/license/mit>.    
-Copyright (C) 2025 Clark Fieseln
+Copyright (C) 2026 Clark Fieseln
 This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law."
 }
@@ -375,7 +392,7 @@ init_minimodem()
 
 # options
 if [ "$1" == "" ] ; then
-    echo "tea2adt: *** you must specify an option, run tea2adt -h for more information ***"
+    printf '%s\n' "tea2adt: you must specify an option, run tea2adt -h for more information"
     echo_help
 elif [ "$1" == "-a" ] || [ "$1" == "--audio-settings" ] ; then  
     echo_audio_interfaces
@@ -388,7 +405,7 @@ elif [ "$1" == "-c" ] || [ "$1" == "--chat" ] ; then
     # wait a little bit so the transmitter can initialize the state flags
     sleep 0.5
     echo_parameters
-    # don't call set_interfaces here,  have not yet a source-output, need yet to run rx.src
+    # don't call set_interfaces here, have not yet a source-output, need yet to run rx.src
     source rx.src | python3 mmrx.py "${PASSWORD}" $1
 elif [ "$1" == "-f" ] || [ "$1" == "--file" ] ; then
     ask_password
@@ -400,7 +417,7 @@ elif [ "$1" == "-f" ] || [ "$1" == "--file" ] ; then
     sleep 0.5
     # track input files
     ${TERMINAL} cat ${PIPE_FILE_IN} &
-    # don't call set_interfaces here,  have not yet a source-output, need yet to run rx.src
+    # don't call set_interfaces here, have not yet a source-output, need yet to run rx.src
     # we don't echo_parameters in -f mode
     source rx.src | python3 mmrx.py "${PASSWORD}" $1
 elif [ "$1" == "-l" ] || [ "$1" == "--llm" ] || [ "$1" == "--llm-chat" ] || [ "$1" == "--llm-prompt" ] ; then
@@ -413,7 +430,7 @@ elif [ "$1" == "-l" ] || [ "$1" == "--llm" ] || [ "$1" == "--llm-chat" ] || [ "$
         if [[ ${LLM_CMD} =~ "ollama run" ]]; then
             while ! curl -s http://localhost:11434/api/tags > /dev/null; do
                 # sleep 1
-                echo "Error: ollama is not running!"
+                printf '%s\n' "Error: ollama is not running!"
                 exit
             done
         fi
@@ -421,14 +438,14 @@ elif [ "$1" == "-l" ] || [ "$1" == "--llm" ] || [ "$1" == "--llm-chat" ] || [ "$
         # (input is done with command 'tmux send-keys -t session_llm')
         tmux new-session -d -s session_llm "${LLM_CMD} > ${PIPE_LLM_OUT}" &
         # TODO: use instead 2> to not redirect errors?
-        # tmux new-session -d -s session_llm "${LLM_CMD} 2> ${PIPE_LLM_OUT}" &
-        echo "LLM model started..."
+        #       tmux new-session -d -s session_llm "${LLM_CMD} 2> ${PIPE_LLM_OUT}" &
+        printf '%s\n' "LLM model started..."
     else
-        echo "Error: llm_cmd is not configured!"
+        printf '%s\n' "Error: llm_cmd is not configured!"
         exit
     fi
     echo_parameters
-    # don't call set_interfaces here,  have not yet a source-output, need yet to run rx.src
+    # don't call set_interfaces here, have not yet a source-output, need yet to run rx.src
     source rx.src | python3 mmrx.py "${PASSWORD}" $1
 elif [ "$1" == "-s" ] || [ "$1" == "--rs" ] || [ "$1" == "--remote-shell" ] || [ "$1" == "--reverse-shell" ] ; then
     ask_password
@@ -438,29 +455,29 @@ elif [ "$1" == "-s" ] || [ "$1" == "--rs" ] || [ "$1" == "--remote-shell" ] || [
     # create persistent shell to run in background with input and output pipes
     while true; do /bin/sh &> ${PIPE_SHELL_OUT}; done 0< ${PIPE_SHELL_IN} &
     echo_parameters
-    # don't call set_interfaces here,  have not yet a source-output, need yet to run rx.src
+    # don't call set_interfaces here, have not yet a source-output, need yet to run rx.src
     source rx.src | python3 mmrx.py "${PASSWORD}" $1
 elif [ "$1" == "-p" ] || [ "$1" == "--probe" ] ; then
     # init_minimodem
     set_volumes
     echo_parameters
     ${TERMINAL} ./mmrxnopwd.sh &
-    echo "**********************************"
-    echo "*** tea2adt probe transmitter ****"
-    echo "**********************************"
-    echo "Test messages "${PROBE_MSG}" sent with a delay of "${PROBE_SLEEP}" seconds..."
-    echo "(a separate terminal is opened to receive unencrypted test messages from the communication partner)"
+    printf '%s\n' "**********************************"
+    printf '%s\n' "*** tea2adt probe transmitter ****"
+    printf '%s\n' "**********************************"
+    printf '%s\n' "Test messages "${PROBE_MSG}" sent with a delay of "${PROBE_SLEEP}" seconds..."
+    printf '%s\n' "(a separate terminal is opened to receive unencrypted test messages from the communication partner)"
     # SET_COMM_IFS
     # set_interfaces
     while :
     do
-        echo "${PROBE_MSG}" | source tx.src
+        printf '%s\n' "${PROBE_MSG}" | source tx.src
         sleep ${PROBE_SLEEP}
     done
 elif [ "$1" == "-g" ] || [ "$1" == "--gui" ] ; then
     python3 gui.py
 elif [ "$1" == "-d" ] || [ "$1" == "--directory" ] ; then
-    echo $(pip show tea2adt | grep Location)"/tea2adt_source"
+    printf '%s\n' $(pip show tea2adt | grep Location)"/tea2adt_source"
 elif [ "$1" == "-V" ] || [ "$1" == "--version" ] ; then
     echo_version
 elif [ "$1" == "-h" ] || [ "$1" == "--help" ] ; then
@@ -468,5 +485,5 @@ elif [ "$1" == "-h" ] || [ "$1" == "--help" ] ; then
 elif [ "$1" == "-i" ] || [ "$1" == "--image" ] ; then
     echo_image  
 else
-    echo "tea2adt: invalid option"
+    printf '%s\n' "tea2adt: invalid option"
 fi
