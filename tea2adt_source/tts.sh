@@ -5,7 +5,7 @@ TTS_OUT_FILE="${HOME}${TMP_PATH}/state/tts_out"
 if [ "${TEXT_TO_SPEECH}" != "" ] ; then
     # TODO: loop and sleep (=poll) while TTS_OUT == true?
     # set flag
-    echo "true" > ${TTS_OUT_FILE}
+    printf '%s\n' "true" > ${TTS_OUT_FILE}
     # get sink index
     INTERFACE_INDEX_TTS_OUT=$(head -n 1 ${HOME}${TMP_PATH}/cfg/interface_index_tts_out)
     # argument
@@ -18,7 +18,7 @@ if [ "${TEXT_TO_SPEECH}" != "" ] ; then
       WAIT_START_TTS_SEC=0.65  # 0.75
     fi
     # text-to-speech:
-    $(echo ${TEXT} | ${TEXT_TO_SPEECH}) &
+    $(printf '%s\n' ${TEXT} | ${TEXT_TO_SPEECH}) &
     # delay
     sleep ${WAIT_START_TTS_SEC}
     # get sink-input
@@ -30,7 +30,7 @@ if [ "${TEXT_TO_SPEECH}" != "" ] ; then
     fi
     # TODO: find out what is the problem with this loop which shall replace sleep ${WAIT_START_TTS_SEC}
     #       after some time we do find the sink-input but then the command pactl move-sink-input fails
-    # while true; do    
+    # while true; do
     #     if [[ ${TEXT_TO_SPEECH} =~ "festival" ]]; then
     #       SINK_INPUT=$(pacmd list-sink-inputs | awk '/index:/{idx=$2} /application.process.binary = "aplay"/{print idx; exit}')
     #     elif [[ ${TEXT_TO_SPEECH} =~ "espeak" ]]; then
@@ -41,9 +41,9 @@ if [ "${TEXT_TO_SPEECH}" != "" ] ; then
     #         break
     #     fi
     #     sleep 0.01
-    # done    
+    # done
     # set output interface for text-to-speech
     $(pactl move-sink-input ${SINK_INPUT} ${INTERFACE_INDEX_TTS_OUT})
     # clear flag
-    echo "false" > ${TTS_OUT_FILE}
+    printf '%s\n' "false" > ${TTS_OUT_FILE}
 fi
