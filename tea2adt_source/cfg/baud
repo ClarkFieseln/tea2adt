@@ -1,6 +1,6 @@
 1200
-#cable(100-15000Hz)=9600
-#termux(over qtox)=1200 (2400 works, but is less reliable)
-#atox(100-15000Hz)=1200
-#walkie-talkie(830-3000Hz)=1200
-#trifa(100-15000Hz)=1200
+# cable(100-15000Hz)=9600
+# termux(over qtox)=1200 (2400 works, but is less reliable)
+# atox(100-15000Hz)=1200
+# walkie-talkie(830-3000Hz)=1200
+# trifa(100-15000Hz)=1200
