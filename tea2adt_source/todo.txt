@@ -1,3 +1,7 @@
+- file received in folder:
+    /data/data/com.termux/files/usr/lib/python3.13/site-packages/tea2adt_source/rx_files
+  instead of:
+    $HOME/$TMP_PATH/rx_files
 - check if settings in $HOME/.sound, $HOME/.bashrc and $PREFIX/etc/pulse/default.pa are actually needed for Termux
 - *** make ollama work again (via tmux session or programmatically or with HTTP-Requests)
       use AI-Agent as reference implementation which keeps a session alive through complete interaction
