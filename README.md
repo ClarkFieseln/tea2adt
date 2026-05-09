@@ -30,7 +30,7 @@ See also <https://www.codeproject.com/Articles/5295970/Audio-Chat-for-Quite-Good
   chmod +x *.sh
 ```
    
-  during first execution you will be asked to install dependencies: minimodem, gpg, bc, tmux, ...
+  During first execution (e.g. tea2adt -V) you will be asked to install dependencies: minimodem, gpg, bc, tmux, ...
   
   but you can also install them yourself with:
 ```
@@ -40,6 +40,18 @@ See also <https://www.codeproject.com/Articles/5295970/Audio-Chat-for-Quite-Good
   sudo apt install tmux
   ...
 ```
+or in Termux:
+```
+  pkg install termux-api
+  pkg install alsa-utils
+  pkg install python-pip
+  pkg install espeak
+  ...
+```
+Check install_dependencies.sh for the complete lists.
+
+Further tools like [tgpt](https://github.com/aandrew-me/tgpt "tgpt") or [ollama](https://github.com/ollama/ollama "ollama") may need to be installed by hand.
+
 
 ## How to use (pip installation)
 ### Chat/Messenger
@@ -72,6 +84,7 @@ then enter and confirm password
 On the other device a chat shall be started to interact with the remote AI prompt.
 
 With this option you may remotely access your local, secure, and self-hosted AI model (like ollama) or AI agent (like OpenClaw) in a secure way!
+(note: for the moment only 'tgpt' tested).
 
 ### File Transfer
 
@@ -90,6 +103,10 @@ To check connectivity and adjust volumes if required.
 ```
 
 In addition, a separate terminal will be opened to read unencrypted probe messages being sent by the other side.
+
+### Finish
+
+Ctrl+C as many times as required to finish.
 
 ## Configuration
 Adapt the configuration as required using the 'terminal GUI' with:
@@ -127,6 +144,8 @@ When installed with git, tea2adt may be called with:
   ./tea2adt -c
 ```
 This is an example to start a chat, but this is the same for any other option.
+
+As a reference check 'How to use (pip installation)'
 
 For more information check the [documentation](https://github.com/ClarkFieseln/tea2adt/blob/main/doc/documentation.md).
 
@@ -274,6 +293,6 @@ https://www.youtube.com/playlist?list=PLX24fhcibpHXllvUgFUw6Ly9cwQcTcKac
 
 ## License
 
-(c) 2025 Clark Fieseln
+(c) 2026 Clark Fieseln
 
 This repository is licensed under the MIT license. See LICENSE for details.
