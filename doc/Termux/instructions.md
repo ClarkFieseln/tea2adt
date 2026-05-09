@@ -96,6 +96,6 @@ The following features have not yet been fully tested in termux and may not work
 - remote AI prompt with 'tgpt'
   
 ## Hint
-In my configuration I used the app 'EZ Booster' on the smartphone running tea2adt on Termux in order to increase the output level of the speaker.
+Although I no longer use it, I initially relied on the “EZ Booster” app on the smartphone running tea2adt via Termux to increase the speaker’s output volume.
 
-There are other apps available for a similar purpose in case the output level is too low.
+If the volume is too low, there are also other apps available that can achieve a similar effect.
