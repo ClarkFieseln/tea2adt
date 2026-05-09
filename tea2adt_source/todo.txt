@@ -1,3 +1,4 @@
+- check if settings in $HOME/.sound, $HOME/.bashrc and $PREFIX/etc/pulse/default.pa are actually needed for Termux
 - *** in ShellTransmitThread() in mmrx.py use shlex.quote(shell_output) as in LLM
   - processing of characters ",*,etc.:
     - in chat with LLM (if " is not closed then we have a problem!)
