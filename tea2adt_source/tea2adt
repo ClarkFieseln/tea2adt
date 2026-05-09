@@ -80,6 +80,7 @@ function ctrl_c()
     # Disable mouse + reset (in case tmux was config. with mouse)
     # otherwise we may get strange characters in the terminal after Ctrl+C
     printf '\033[?1000l\033[?1002l\033[?1006l\033c'
+    tmux kill-session -t session_llm 2>/dev/null || true
     tmux kill-server 2>/dev/null || true
     stty sane 2>/dev/null || true
     ./killtea2adt.sh 2> /dev/null  # &
