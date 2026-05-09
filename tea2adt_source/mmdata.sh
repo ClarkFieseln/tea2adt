@@ -52,19 +52,19 @@ if [[ ${SEQ_RX_NEW} != ${INVALID_SEQ_NR} ]] ; then
     SEQ_RX=${SEQ_RX_NEW}
 else
     if [ "${VERBOSE}" == true ] ; then
-        echo "WARNING: mmdata.sh called but SEQ_RX = INVALID_SEQ_NR. Defaulting to 0!"
+        printf '%s\n' "WARNING: mmdata.sh called but SEQ_RX = INVALID_SEQ_NR. Defaulting to 0!"
     fi
     SEQ_RX=0 # default is different to 1 which is the first value to be received
 fi
 seq_tx=$((SEQ_TX+33))
 seq_rx=$((SEQ_RX+33))
-seq_tx_ascii=$(printf "\x$(printf %x $seq_tx)") 
-seq_rx_ascii=$(printf "\x$(printf %x $seq_rx)") 
+seq_tx_ascii=$(printf "\x$(printf %x $seq_tx)")
+seq_rx_ascii=$(printf "\x$(printf %x $seq_rx)")
 
 # the first argument is the password
 PASSWORD="$1"
 DATA="$2"
-                                  
+
 # send DATA
 ###########
 if [ "${NEED_ACK}" == "true" ] ; then
@@ -76,30 +76,30 @@ if [ "${NEED_ACK}" == "true" ] ; then
         seq_rx_ascii=$(printf "\x$(printf %x $seq_rx)")        
         # send DATA
         if [[ ${PREAMBLE} == "" && ${TRAILER} == "" ]] ; then
-            echo "${seq_tx_ascii}${seq_rx_ascii}[data]${DATA}" | source gpg.src
+            printf '%s\n' "${seq_tx_ascii}${seq_rx_ascii}[data]${DATA}" | source gpg.src
         else
-            echo -n ${PREAMBLE} > ${MSGFILE}
-            echo "${seq_tx_ascii}${seq_rx_ascii}[data]${DATA}" | source gpgappend.src
+            printf '%s' ${PREAMBLE} > ${MSGFILE}
+            printf '%s\n' "${seq_tx_ascii}${seq_rx_ascii}[data]${DATA}" | source gpgappend.src
             if [ "${TRAILER}" != "" ] ; then
-                echo ${TRAILER} >> ${MSGFILE}
+                printf '%s\n' ${TRAILER} >> ${MSGFILE}
             fi
         fi
         if [ "${VERBOSE}" == true ] ; then
-            echo "> data[${SEQ_TX},${SEQ_RX}]"
+            printf '%s\n' "> data[${SEQ_TX},${SEQ_RX}]"
         fi
         # send start_msg?
         if [ "${START_MSG}" != "" ] ; then
-            echo "${START_MSG}" | source tx.src
-        fi        
+            printf '%s\n' "${START_MSG}" | source tx.src
+        fi
         # send message with encrypted data
         cat ${MSGFILE} | source tx.src
         # add end_msg?
         if [ "${END_MSG}" != "" ] ; then
-            echo "${END_MSG}" | source tx.src
-        fi            
+            printf '%s\n' "${END_MSG}" | source tx.src
+        fi
     else
         if [ "${VERBOSE}" == true ] ; then
-            echo "FAILED to send: data[${SEQ_TX},${SEQ_RX},${SEQ_RX_NEW}]"
-        fi            
+            printf '%s\n' "FAILED to send: data[${SEQ_TX},${SEQ_RX},${SEQ_RX_NEW}]"
+        fi
     fi
-fi                        
+fi
