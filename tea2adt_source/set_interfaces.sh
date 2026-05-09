@@ -18,7 +18,7 @@ set_interfaces()
         done
         # set configured sink for this specific sink-input
         pactl move-sink-input ${SINK_INPUT} ${INTERFACE_INDEX_MINIMODEM_OUT}
-        echo "set minimodem output with sink input ${SINK_INPUT} to interface index ${INTERFACE_INDEX_MINIMODEM_OUT}"
+        printf '%s\n' "set minimodem output with sink input ${SINK_INPUT} to interface index ${INTERFACE_INDEX_MINIMODEM_OUT}"
     fi
     # microphone / source (communication)
     if [ "${INTERFACE_INDEX_MINIMODEM_IN}" != "" ] ; then
@@ -32,7 +32,7 @@ set_interfaces()
         done
         # set configured source for this specific source-output
         pactl move-source-output ${SOURCE_OUTPUT} ${INTERFACE_INDEX_MINIMODEM_IN}
-        echo "set minimodem input with source output ${SOURCE_OUTPUT} to interface index ${INTERFACE_INDEX_MINIMODEM_IN}"
+        printf '%s\n' "set minimodem input with source output ${SOURCE_OUTPUT} to interface index ${INTERFACE_INDEX_MINIMODEM_IN}"
     fi
 }
 
