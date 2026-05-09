@@ -14,28 +14,15 @@ I will describe some steps that worked for me while trying some things.
 
 Not all these steps might be required in your case.
 
-Once the Apps are installed give Termux permission to access your microphone.
+Once the Apps are installed give Termux (and Termux-API?) permission to access your microphone.
 
-Then type the following (optional steps are shown in square brackets '[]'):
+Install python with:
 ```
-  [termux-change-repo] # select Single, then select the official Termux repository
-  [termux-setup-storage] # to access your device storage under /sdcard
-  [termux-info]
-  pkg update
-  pkg upgrade
-  apt install termux-api
-  pkg install termux-api
-  pkg install alsa-utils
-  pkg install python-pip
-  pkg install espeak
-  apt isntall minimodem
-  apt install gnupg
-  apt install tmux
-  apt install bc
-  pip install tea2adt
-  [tea2adt -V] # answer with 'n'
+pkg install python-pip
 ```
-Now you need to create or modify the following files:
+Then follow the steps described under "Installation" on the main page.
+
+After installation you need to create or modify the following files:
 
 - .sound and .bashrc found in the home directory
 
@@ -74,14 +61,20 @@ Type:
 ## Use
 Type:
 ```
+  # prevent the Android device from entering deep sleep mode while using the Termux terminal emulator:
+      termux-wake-lock
   # check audio connectivity and adjust volumes as required:
-  tea2adt -p
+      tea2adt -p
+      (Ctrl+C after test)
   # run tea2adt:
-  tea2adt -c  # chat
+      tea2adt -c  # chat
   # or
-  tea2adt -s  # shell-terminal
+      tea2adt -s  # shell-terminal
   # or
-  tea2adt -f  # file-transfer
+      tea2adt -f  # file-transfer
+  # or
+      tea2adt -l  # AI-prompt
+  # Ctrl+C as many times as required to finish
 ```
 The audio infrastructure connected to your offline smartphone may be e.g.:
 - PSTN (Public Switched Telphone Network), just a landline telephone
@@ -92,7 +85,7 @@ The audio infrastructure connected to your offline smartphone may be e.g.:
 - other smartphones making a call
 
 In my particular case the following tea2adt settings worked very well:
-- baud: 2400
+- baud: 1200
 - keep_time_sec: 0.0
 - preamble, start_msg, end_msg: # all empty
 - retransmission_timeout_sec: 5.0
@@ -100,7 +93,7 @@ In my particular case the following tea2adt settings worked very well:
 ## Tested features
 The following features have not yet been fully tested in termux and may not work in this environment:
 - text-to-speech
-- remote AI prompt
+- remote AI prompt with 'tgpt'
   
 ## Hint
 In my configuration I used the app 'EZ Booster' on the smartphone running tea2adt on Termux in order to increase the output level of the speaker.
