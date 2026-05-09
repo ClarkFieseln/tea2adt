@@ -1390,6 +1390,7 @@ def main():
             # Disable mouse + reset terminal (prevent strange characters after Ctrl+C)
             sys.stdout.write('\033[?1000l\033[?1002l\033[?1006l\033c')
             sys.stdout.flush()
+            subprocess.run('tmux kill-session -t session_llm 2>/dev/null || true', shell=True)
             subprocess.run('tmux kill-server 2>/dev/null || true', shell=True)
             subprocess.run('stty sane 2>/dev/null', shell=True)
             #     we could remove this code, as we terminate processes with SIGTERM in tea2adt.py
