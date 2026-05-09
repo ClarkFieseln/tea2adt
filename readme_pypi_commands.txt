@@ -13,22 +13,15 @@ before you start:
 
 # set the 'default' configuration:
 ----------------------------------
-
-echo "true" > cfg/install_dependencies
+printf '%s\n' "true" > cfg/install_dependencies
 
 # install dependencies:
 -----------------------
-
 sudo apt update
-
 sudo apt upgrade
-
 python3 -m pip install --upgrade pip
-
 pip install wheel
-
 pip install minimodem
-
 pip install gpg
 
 
@@ -37,27 +30,20 @@ for test in test.pypi:
 ######################
 
 # inside the folder with the setup.py file type:
-
 python3 -m pip install -e . --config-settings editable_mode=compat
-
 python3 -m build
-
 twine check dist/*
-
 cd tea2adt_source
-
 # test if the local installation works:
-
 tea2adt -V
 
 -----------------------------------------------------------------------------
 
 pip install -I --user idna
+(you may ignore warnings like: "webencodings: Missing dependency for ip2geotools")
 
 # inside the folder with the setup.py file type:
-
 python3 -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
-
       user: __token__
       pwd: (paste token here)
 
@@ -95,17 +81,11 @@ for release in pypi:
 ####################
 
 # TODO: setup.py install is deprecated -> adapt procedure as required.
-
 # inside the folder with the setup.py file type:
-
 python3 setup.py sdist bdist_wheel
-
 twine check dist/*
-
 twine upload dist/*
-
 # enter user and password (or token), e.g.:
-
       user: __token__
       pwd: (paste token here)
 
