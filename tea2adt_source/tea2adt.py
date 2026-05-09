@@ -30,7 +30,7 @@ def get_package_installation_path(package_name):
         return None
     except FileNotFoundError:
         return None
-        
+
 # python wrapper for tea2adt shell script
 # in order to use PyPi
 ##########################################
@@ -54,22 +54,23 @@ def main():
     # read configured terminal
     TERMINAL = f.read().splitlines()[0]
     f.close()
-    # with the following line, no message or stack trace will be printed when you Ctrl+C this program
+    # with the following line, no message or stack trace will be printed when the program is exit with Ctrl+C
     signal(SIGINT, lambda _, __: exit())
     # parse arguments
-    #################                    
+    #################
     if len(sys.argv) > 1:
         try:
             # call tea2adt shell script
-            ############################
+            ###########################
             if (("tmux" in TERMINAL) and ((sys.argv[1] == "-c") or (sys.argv[1] == "--chat") or (sys.argv[1] == "-f") or 
                 (sys.argv[1] == "--file") or (sys.argv[1] == "--file-transfer") or (sys.argv[1] == "-p") or (sys.argv[1] == "--probe"))):
                 # create a new tmux session where following tmux calls will execute (but only for arguments -c, -s, -f and -p)
-                command = "".join(["tmux new-session ./tea2adt '", sys.argv[1], "'"])
+                command = f"tmux new-session ./tea2adt '{sys.argv[1]}'"
             else:
-                command = "".join(["./tea2adt '", sys.argv[1], "'"])
+                command = f"./tea2adt '{sys.argv[1]}'"
             p1 = subprocess.Popen(command, shell=True, stdout=None, text=True)
-            '''p1 = subprocess.Popen(command,
+            '''
+            p1 = subprocess.Popen(command,
                             shell=True,
                             text=True,
                             stdin =subprocess.PIPE,
@@ -77,16 +78,14 @@ def main():
                             stderr=subprocess.PIPE # ,
                             # universal_newlines=True,
                             # bufsize=0
-                            )'''
+                            )
+            '''
             out, err = p1.communicate()
-            if p1.returncode == 0:
-                p1.terminate()
-                p1.kill()        
         except:
             # send the SIGTERM signal to all the process groups to terminate processes launched from here
             os.killpg(os.getpgid(p1.pid), SIGTERM)
     else:
-        print("tea2adt: *** you must specify an option, run tea2adt -h for more information ***")
-    
+        print("tea2adt: you must specify an option, run tea2adt -h for more information")
+
 if __name__ == '__main__':
     main()
