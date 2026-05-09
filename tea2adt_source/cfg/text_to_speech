@@ -1,6 +1,7 @@
 
 # command to execute TTS:
 # -----------------------
+# espeak -s 50
 # espeak -s 120
 # festival --tts
 #
