@@ -806,15 +806,10 @@ def main():
                     # prepare data for transmission as a "block" (otherwise we would send each line separately)
                     shell_output_printable = shell_output
                     shell_output = shell_output.replace("\n", "\r")
-                    # TODO: use shlex.quote(llm_output) as in LLM
-                    #       or
-                    #       find out why we get characters that are not allowed in file names
+                    # TODO: if still problems, find out why we get characters that are not allowed in file names
                     #       and extend this workaround to further characters like *, ?, >, <, :, |, ...
                     #       check e.g. https://stackoverflow.com/questions/4814040/allowed-characters-in-filename
-                    shell_output = shell_output.replace("(", "\\(")
-                    shell_output = shell_output.replace(")", "\\)")
-                    shell_output = shell_output.replace("�", "\\�")
-                    shell_output = shell_output.replace("'", "\\'")
+                    shell_output = shlex.quote(shell_output)
                     # avoid collisions
                     while TX_SENDING:
                         sleep(TIMEOUT_POLL_SEC)
