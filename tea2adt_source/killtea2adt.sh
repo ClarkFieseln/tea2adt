@@ -3,7 +3,7 @@
 { # try
     for pid in $(ps -ef | grep 'minimodem' | awk '{print $2}'); 
     do
-        kill -9 $pid; 
+        kill -9 $pid;
     done
 } || { # catch
     # save log for exception
@@ -12,7 +12,7 @@
 { # try
     for pid in $(ps -ef | grep 'mmsessionout.sh' | awk '{print $2}'); 
     do
-        kill -9 $pid; 
+        kill -9 $pid;
     done
 } || { # catch
     # save log for exception
@@ -20,9 +20,18 @@
 }
 # TODO: remove this code block, mmsessionout.sh seems to be working fine
 { # try
+    for pid in $(ps -ef | grep 'tgpt -i' | awk '{print $2}');
+    do
+        kill -9 $pid;
+    done
+} || { # catch
+    # save log for exception
+    :
+}
+{ # try
     for pid in $(ps -ef | grep 'tmux new-session -d -s session_llm' | awk '{print $2}'); 
     do
-        kill -9 $pid; 
+        kill -9 $pid;
     done
 } || { # catch
     # save log for exception
@@ -43,7 +52,7 @@
 { # try
     for pid in $(ps -ef | grep "./tea2adt -" | awk '{print $2}'); 
     do
-        kill -9 $pid; 
+        kill -9 $pid;
     done
 } || { # catch
     # save log for exception
@@ -52,7 +61,7 @@
 { # try
     for pid in $(ps -ef | grep mmrx.py | awk '{print $2}'); 
     do
-        kill -9 $pid; 
+        kill -9 $pid;
     done
 } || { # catch
     # save log for exception
@@ -62,7 +71,7 @@
 { # try
     for pid in $(ps -ef | grep "ollama_llama_server --model" | awk '{print $2}'); 
     do
-        kill -9 $pid; 
+        kill -9 $pid;
     done
 } || { # catch
     # save log for exception
