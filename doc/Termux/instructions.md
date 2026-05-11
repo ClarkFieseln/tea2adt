@@ -16,7 +16,7 @@ Not all these steps might be required in your case.
 
 Once the Apps are installed give Termux (and Termux-API?) permission to access your microphone.
 
-Install python with:
+Install python pip with:
 ```
 pkg install python-pip
 ```
