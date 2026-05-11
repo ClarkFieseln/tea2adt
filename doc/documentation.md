@@ -49,7 +49,7 @@ Although it is perfectly possible to connect the online and the offline devices 
 
 The old good analog cables (e.g. 3.5mm, RCA) offer an important additional barrier against attacks.
 
-While the digital transmission of audio information requires usually a client and a server running on both devices and also standardized communication protocols which are vulnerable to attacks, the plain analogue transmission of audio offers a much smaller attack surface.
+While the digital transmission of audio information requires usually a client and a server running on both devices and also standard communication protocols which are vulnerable to attacks, the plain analogue transmission of audio offers a much smaller attack surface.
 
 
 ## Volume levels
