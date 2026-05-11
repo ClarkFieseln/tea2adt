@@ -1,0 +1,167 @@
+Simplified OpenClaw Architecture:
+#################################
+
+                  ┌──────────────────────────┐
+                  │      Messaging Apps      │
+                  │ WhatsApp / Telegram /    │
+                  │ Slack / Discord / etc.   │
+                  └────────────┬─────────────┘
+                               │
+                     (Channel Bridges)
+                               │
+        ┌──────────────────────▼──────────────────────┐
+        │                GATEWAY                      │
+        │---------------------------------------------│
+        │ • WebSocket control plane                   │
+        │ • Auth + routing                            │
+        │ • Session management                        │
+        │ • Event bus                                 │
+        │ • Agent orchestration                       │
+        │ • State + presence                          │
+        └──────────────┬──────────────┬───────────────┘
+                       │              │
+             ┌─────────▼──────┐  ┌────▼─────────┐
+             │     Brain      │  │    Memory    │
+             │----------------│  │--------------│
+             │ LLM providers  │  │ Long-term    │
+             │ Claude/OpenAI  │  │ memory       │
+             │ Planning       │  │ Markdown/db  │
+             │ Reasoning      │  │ embeddings   │
+             └─────────┬──────┘  └────┬─────────┘
+                       │              │
+                       └──────┬───────┘
+                              │
+                    ┌─────────▼─────────┐
+                    │       Hands       │
+                    │-------------------│
+                    │ Shell commands    │
+                    │ Browser control   │
+                    │ File system       │
+                    │ APIs / tools      │
+                    │ Device automation │
+                    └─────────┬─────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          │                   │                   │
+   ┌──────▼───────┐  ┌────────▼───────┐   ┌───────▼───────┐
+   │ Browser Node │  │ Android Bridge │   │  iOS Bridge   │
+   │ Chrome/CDP   │  │ ADB automation │   │ XCUITest      │
+   └──────────────┘  └────────────────┘   └───────────────┘
+
+------------------------------------------
+
+Revised OpenClaw Architecture (with tea2adt):
+#############################################
+
+                         ┌─────────────────────────┐
+                         │      USER DEVICE        │
+                         │  Phone / Laptop / etc.  │
+                         └──────────┬──────────────┘
+                                    │
+                        encrypted text / audio modem
+                                    │
+                          (human-mediated transfer)
+                                    │
+                     ┌──────────────▼──────────────┐
+                     │         tea2adt             │
+                     │-----------------------------│
+                     │ Text ↔ Audio/Data encoding  │
+                     │ Encryption                  │
+                     │ Data diode workflow         │
+                     │ Human-reviewed transfer     │
+                     └──────────────┬──────────────┘
+                                    │
+                             LOCAL STDIO PIPE
+                                    │
+══════════════════════ AIR GAP BOUNDARY ══════════════════════
+                                    │
+                     ┌──────────────▼──────────────┐
+                     │   tea2adt Channel Plugin    │
+                     │  (ClawHub / Community SDK)  │
+                     │-----------------------------│
+                     │ Plugin-owned transport      │
+                     │ Session grammar             │
+                     │ Pairing/security            │
+                     │ Message threading           │
+                     └──────────────┬──────────────┘
+                                    │
+                           OpenClaw Plugin API
+                                    │
+               ┌────────────────────▼───────────────────┐
+               │               GATEWAY                  │
+               │----------------------------------------│
+               │ Core orchestration only                │
+               │ Event routing                          │
+               │ Session state                          │
+               │ Shared message dispatch                │
+               │ NO transport-specific logic            │
+               └──────────────┬────────────┬────────────┘
+                              │            │
+                    ┌─────────▼──────┐ ┌───▼──────────┐
+                    │     Brain      │ │    Memory    │
+                    │----------------│ │--------------│
+                    │ LLM reasoning  │ │ Persistent   │
+                    │ Planning       │ │ state/store  │
+                    └─────────┬──────┘ └────┬─────────┘
+                              │             │
+                              └──────┬──────┘
+                                     │
+                           ┌─────────▼─────────┐
+                           │       Hands       │
+                           │-------------------│
+                           │ Shell             │
+                           │ Browser           │
+                           │ Automation        │
+                           │ Local tools       │
+                           └─────────┬─────────┘
+                                     │
+                    ┌────────────────┼────────────────┐
+                    │                │                │
+             ┌──────▼──────┐  ┌──────▼──────┐  ┌──────▼──────┐
+             │ Browser SDK │  │ Android ADB │  │  iOS Bridge │
+             └─────────────┘  └─────────────┘  └─────────────┘
+
+
+Originally, bridges were treated conceptually like this:
+Bridge → Core Gateway
+OpenClaw's actual philosophy:
+Bridge → Plugin SDK → Core Gateway
+Optional capabilities should live as plugins.
+
+OpenClaw Core should NOT understand air-gap semantics.
+So tea2adt sits outside the executable trust boundary.
+All encoding/decoding occurs outside OpenClaw's executable boundary.
+
+Normally bridges are convenience layers.
+With tools like tea2adt they become containment interfaces.
+Therefore, tea2adt is a controlled information membrane instead of a normal transport protocol.
+
+openclaw-tea2adt-channel-plugin:
+################################
+tea2adt as a plugin is one possible implementation of a "Secure / Air-Gapped Channel Plugin Specification"
+it supports offline / air-gapped / asynchronous transports
+- async message queues (offline synchronization)
+- delayed delivery semantics
+- low-bandwidth transports
+- store-and-forward messaging
+- human-approved message release (human-mediated channel)
+- half-duplex channels
+- offline threading persistence
+- diode-safe interfaces
+- transport capability descriptors
+- policy-driven message release
+- auditable message chains
+
+----------------------------------------------------------------------------------------
+
+TODO:
+#####
+1) check if there is now some place to make the request:
+https://github.com/openclaw/openclaw/issues/80555#issue-4418252854
+
+2) or implement the plugin myself:
+https://clawhub.ai/plugins
+
+
+
+
