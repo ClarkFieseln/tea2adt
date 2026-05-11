@@ -1,7 +1,16 @@
+- pip install
+  - install dependencies automatically
+  - distinguish termux yes/no - different packages
 - file received in folder:
     /data/data/com.termux/files/usr/lib/python3.13/site-packages/tea2adt_source/rx_files
   instead of:
     $HOME/$TMP_PATH/rx_files
+** Chirps-libary i.o. minimodem?...then we could use any Messenger-App
+   (** ggwave looks also very promising, seems to handle DSP-hostile environment problems)
+   (scipy can generate and detect chrips without dedicated library!)
+   Chirps (swept-frequency signals) are more robust to DSP interference because energy is spread across a frequency range rather than concentrated at fixed tones.
+   Echo cancellers and noise suppressors tend to target steady-state tones - a chirp is harder to mistake for "noise to remove".
+   Chirp-based systems (like those used in LoRa, bat echolocation, radar) are inherently more resilient to multipath and partial distortion.
 - check if settings in $HOME/.sound, $HOME/.bashrc and $PREFIX/etc/pulse/default.pa are actually needed for Termux
 - *** make ollama work again (via tmux session or programmatically or with HTTP-Requests)
       use AI-Agent as reference implementation which keeps a session alive through complete interaction
@@ -16,12 +25,6 @@
   try smartphone-based solution (without PC): smart(Termux)-smart(voice-call)  <--->  smart(voice-call)-smart(Termux)
   - no echo-supression, etc...
   - adapt settings as needed
-  ** Chirps-libary i.o. minimodem?...when we could use any Messenger-App
-     (** ggwave looks also very promising, seems to handle DSP-hostile environment problems)
-     (scipy can generate and detect chrips without dedicatec library!)
-     Chirps (swept-frequency signals) are more robust to DSP interference because energy is spread across a frequency range rather than concentrated at fixed tones.
-     Echo cancellers and noise suppressors tend to target steady-state tones - a chirp is harder to mistake for "noise to remove".
-     Chirp-based systems (like those used in LoRa, bat echolocation, radar) are inherently more resilient to multipath and partial distortion.
 - test offline chat apps communicating over bluetooth or wifi
   check apps for:
   wireless ad hoc network (WANET)
