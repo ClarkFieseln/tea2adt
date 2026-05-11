@@ -93,7 +93,6 @@ In my particular case the following tea2adt settings worked very well:
 ## Tested features
 The following features have not yet been fully tested in termux and may not work in this environment:
 - text-to-speech
-- remote AI prompt with 'tgpt'
   
 ## Hint
 Although I no longer use it, I initially relied on the “EZ Booster” app on the smartphone running tea2adt via Termux to increase the speaker’s output volume.
