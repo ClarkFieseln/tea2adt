@@ -5,6 +5,8 @@
 - check if settings in $HOME/.sound, $HOME/.bashrc and $PREFIX/etc/pulse/default.pa are actually needed for Termux
 - *** make ollama work again (via tmux session or programmatically or with HTTP-Requests)
       use AI-Agent as reference implementation which keeps a session alive through complete interaction
+- *** implement a plugin for OpenClaw(?):
+      https://github.com/ClarkFieseln/tea2adt/blob/main/doc/OpenClaw/openclaw-tea2adt-channel-plugin.txt
 - add a new configuration parameter for termux-volume and print it during startup, similar to the other volumes
   (of course: code used only if termux available, see if clause in set_volumes() in tea2adt)
 - try messengers: TRIFA / Session / Toxic / uTox / Toxygen / Venom / Matrix-Element
