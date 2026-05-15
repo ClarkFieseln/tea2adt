@@ -10,6 +10,10 @@ But then you need to change the name of your tool and create the corresponding p
 #################
 before you start:
 #################
+# (optional) if required first activate an evironment with the "same" python version
+# cd at same level of project
+python3 -m venv tea2adt_venv
+source tea2adt_venv/bin/activate
 
 # set the 'default' configuration:
 ----------------------------------
@@ -39,7 +43,8 @@ tea2adt -V
 
 -----------------------------------------------------------------------------
 
-pip install -I --user idna
+pip install -I --user idna   # installs into your user site-packages directory
+(pip install -I idna  # installs into the currently active Python environment)
 (you may ignore warnings like: "webencodings: Missing dependency for ip2geotools")
 
 # inside the folder with the setup.py file type:
@@ -47,32 +52,33 @@ python3 -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
       user: __token__
       pwd: (paste token here)
 
-# now copy the text at the beginning of the page, see e.g.:
-   https://test.pypi.org/project/tea2adt/0.0.6/
+# if you copy the text at the beginning of the page, see e.g.:
+#   https://test.pypi.org/project/tea2adt/0.0.6/
+# it will not find the packages
+# so, instead do:
+    pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple tea2adt==0.0.6
 
 # the text may be something like this:
 # pip install -i https://test.pypi.org/simple/ tea2adt==0.0.6
 # you may first want to create a virtual environment:
-   virtualenv venv_test
-   cd venv_test
-   source bin/activate
-   (or source local/bin/activate ?)
+    python3 -m venv tea2adt_venv
+    source tea2adt_venv/bin/activate
 
-# repeat steps above in "before you start"
+# repeat steps above in "before you start" to install APT packages
 
 # after that type:
-   pip install -i https://test.pypi.org/simple/ tea2adt==0.0.6
-   (you may need to repeat if the first try fails!)
+    pip install -i https://test.pypi.org/simple/ tea2adt==0.0.6
+    (you may need to repeat if the first try fails!)
 
 # now the command tea2adt is available for use, check installation path with:
-   pip show tea2adt
+    pip show tea2adt
 # change to that 'Location', e.g.:
-   cd /home/<user>/.pyenv/versions/3.10.14/lib/python3.10/site-packages/tea2adt_source
-   tea2adt -V
-   pip list | grep tea2adt
+    cd /home/<user>/.pyenv/versions/3.10.14/lib/python3.10/site-packages/tea2adt_source
+    tea2adt -V
+    pip show tea2adt
 
 # leave the virtual environment:
-   deactivate
+    deactivate
 
 ------------------------------------------------------------------------------
 
@@ -90,9 +96,9 @@ twine upload dist/*
       pwd: (paste token here)
 
 # now the pypi project is available here:
-   https://pypi.org/project/tea2adt
+    https://pypi.org/project/tea2adt
 
 # install on the machine you want to use the tool with:
-   pip install tea2adt
+    pip install tea2adt
 
 # now the command tea2adt is available for use
